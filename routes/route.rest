@@ -1,0 +1,28 @@
+GET http://217.154.70.67:3000/subscribers
+
+####
+
+GET http://217.154.70.67:3000/subscribers/67ccbbdcb10771de0a043287
+
+###
+
+POST http://217.154.70.67:3000/subscribers
+Content-Type: application/json
+
+{
+    "name": "Amazing Person",
+    "subscribedToChannel": "Web Dev Simplified"
+}
+
+###
+
+DELETE http://217.154.70.67:3000/subscribers/67ccbbdfb10771de0a043289
+
+###
+
+PATCH http://217.154.70.67:3000/subscribers/67ccbbdcb10771de0a043287
+Content-Type: application/json
+
+{
+    "name": "New Person"
+}
