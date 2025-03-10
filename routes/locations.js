@@ -1,6 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const Location = require('../models/location')
+const User = require('./users')
 
 // Getting all locations
 router.get('/', async (req, res) => {
@@ -21,6 +22,7 @@ router.get('/:id', getLocation, (req, res) => {
 router.post('/', async (req, res) => {
     const location = new Location({
         _id: req.body.id,
+        version: req.body.version,
         userId: req.body.userId,
         lastEdited: req.body.lastEdited,
         latitude: req.body.latitude,
@@ -30,9 +32,9 @@ router.post('/', async (req, res) => {
         additionalInfo: req.body.additionalInfo,
         access: req.body.access,
         sawmill: req.body.sawmill,
-        overSizeSawmill: req.body.overSizeSawmill,
-        totalQuantity: req.body.totalQuantity,
-        oversizedQuantity: req.body.oversizedQuantity,
+        oversizeSawmill: req.body.oversizeSawmill,
+        normalQuantity: req.body.normalQuantity,
+        oversizeQuantity: req.body.oversizeQuantity,
         pieceCount: req.body.pieceCount
     })
     try {
@@ -45,6 +47,7 @@ router.post('/', async (req, res) => {
 
 // Updating one
 router.patch('/:id', getLocation, async (req, res) => {
+    if (req.body.version != null) res.location.version = req.body.version
     if (req.body.userId != null) res.location.userId = req.body.userId
     if (req.body.lastEdited != null) res.location.lastEdited = req.body.lastEdited
     if (req.body.latitude != null) res.location.latitude = req.body.latitude
@@ -54,9 +57,9 @@ router.patch('/:id', getLocation, async (req, res) => {
     if (req.body.additionalInfo != null) res.location.additionalInfo = req.body.additionalInfo
     if (req.body.access != null) res.location.access = req.body.access
     if (req.body.sawmill != null) res.location.sawmill = req.body.sawmill
-    if (req.body.overSizeSawmill != null) res.location.overSizeSawmill = req.body.overSizeSawmill
-    if (req.body.totalQuantity != null) res.location.totalQuantity = req.body.totalQuantity
-    if (req.body.oversizedQuantity != null) res.location.oversizedQuantity = req.body.oversizedQuantity
+    if (req.body.oversizeSawmill != null) res.location.oversizeSawmill = req.body.oversizeSawmill
+    if (req.body.normalQuantity != null) res.location.normalQuantity = req.body.normalQuantity
+    if (req.body.oversizeQuantity != null) res.location.oversizeQuantity = req.body.oversizeQuantity
     if (req.body.pieceCount != null) res.location.pieceCount = req.body.pieceCount
 
     try {

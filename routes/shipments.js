@@ -21,13 +21,15 @@ router.get('/:id', getShipment, (req, res) => {
 router.post('/', async (req, res) => {
     const shipment = new Shipment({
         _id: req.body.id,
+        version: req.body.version,
         userId: req.body.userId,
-        lastEdited: req.body.lastEdited,
+        locationId: req.body.locationId,
+        date: req.body.date,
         contract: req.body.contract,
         additionalInfo: req.body.additionalInfo,
         sawmill: req.body.sawmill,
-        totalQuantity: req.body.totalQuantity,
-        oversizedQuantity: req.body.oversizedQuantity,
+        normalQuantity: req.body.normalQuantity,
+        oversizeQuantity: req.body.oversizeQuantity,
         pieceCount: req.body.pieceCount
     })
     try {
@@ -40,13 +42,15 @@ router.post('/', async (req, res) => {
 
 // Updating one
 router.patch('/:id', getShipment, async (req, res) => {
+    if (req.body.version != null) res.shipment.version = req.body.version
     if (req.body.userId != null) res.shipment.userId = req.body.userId
-    if (req.body.lastEdited != null) res.shipment.lastEdited = req.body.lastEdited
+    if (req.body.locationId != null) res.shipment.locationId = req.body.locationId
+    if (req.body.date != null) res.shipment.date = req.body.date
     if (req.body.contract != null) res.shipment.contract = req.body.contract
     if (req.body.additionalInfo != null) res.shipment.additionalInfo = req.body.additionalInfo
     if (req.body.sawmill != null) res.shipment.sawmill = req.body.sawmill
-    if (req.body.totalQuantity != null) res.shipment.totalQuantity = req.body.totalQuantity
-    if (req.body.oversizedQuantity != null) res.shipment.oversizedQuantity = req.body.oversizedQuantity
+    if (req.body.normalQuantity != null) res.shipment.normalQuantity = req.body.normalQuantity
+    if (req.body.oversizeQuantity != null) res.shipment.oversizeQuantity = req.body.oversizeQuantity
     if (req.body.pieceCount != null) res.shipment.pieceCount = req.body.pieceCount
 
     try {

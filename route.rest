@@ -1,0 +1,118 @@
+### Variables
+@baseUrl = http://localhost:3000
+@contentType = application/json
+
+### ===================== LOCATION ENDPOINTS =====================
+
+### Get all locations
+GET {{baseUrl}}/locations
+Content-Type: {{contentType}}
+
+### Get a specific location
+GET {{baseUrl}}/locations/123
+Content-Type: {{contentType}}
+
+### Create a new location
+POST {{baseUrl}}/locations
+Content-Type: {{contentType}}
+
+{
+  "id": 4567,
+  "userId": 456,
+  "lastEdited": "2025-03-09T10:00:00Z",
+  "latitude": 61.1699,
+  "longitude": 25.9384,
+  "partieNr": "PART-001",
+  "contract": "CONTRACT-2025-001",
+  "additionalInfo": "Forest area with good road access",
+  "access": "Easy access via forest road",
+  "sawmill": "Primary Sawmill",
+  "oversizeSawmill": "Large Sawmill Inc.",
+  "normalQuantity": 500,
+  "oversizeQuantity": 50,
+  "pieceCount": 750
+}
+
+### Update a location
+PATCH {{baseUrl}}/locations/123
+Content-Type: {{contentType}}
+
+{
+  "additionalInfo": "Forest area with excellent road access",
+  "normalQuantity": 550,
+  "oversizeQuantity": 60
+}
+
+### Delete a location
+DELETE {{baseUrl}}/locations/123
+Content-Type: {{contentType}}
+
+### ===================== SHIPMENT ENDPOINTS =====================
+
+### Get all shipments
+GET {{baseUrl}}/shipments
+Content-Type: {{contentType}}
+
+### Get a specific shipment
+GET {{baseUrl}}/shipments/123
+Content-Type: {{contentType}}
+
+### Create a new shipment
+POST {{baseUrl}}/shipments
+Content-Type: {{contentType}}
+
+{
+  "id": 4567,
+  "userId": 456,
+  "lastEdited": "2025-03-09T11:15:00Z",
+  "contract": "CONTRACT-2025-001",
+  "additionalInfo": "Priority delivery",
+  "sawmill": "Primary Sawmill",
+  "normalQuantity": 400,
+  "oversizeQuantity": 40,
+  "pieceCount": 600
+}
+
+### Update a shipment
+PATCH {{baseUrl}}/shipments/123
+Content-Type: {{contentType}}
+
+{
+  "additionalInfo": "Express priority delivery",
+  "normalQuantity": 420,
+  "pieceCount": 630
+}
+
+### Delete a shipment
+DELETE {{baseUrl}}/shipments/123
+Content-Type: {{contentType}}
+
+### ===================== USER ENDPOINTS =====================
+
+### Get all users
+GET {{baseUrl}}/users
+Content-Type: {{contentType}}
+
+### Get a specific user
+GET {{baseUrl}}/users/102
+Content-Type: {{contentType}}
+
+### Create a new user
+POST {{baseUrl}}/users
+Content-Type: {{contentType}}
+
+{
+  "name": "Sepp Dräxl"
+}
+
+### Update a user
+PATCH {{baseUrl}}/users/67cd036790ddb8aa9ffa07f4
+Content-Type: {{contentType}}
+
+{
+  "name": "John T. Lumberjack"
+}
+
+### Delete a user
+DELETE {{baseUrl}}/users/67ce6c93901d7bce2a4a4bfe
+Content-Type: {{contentType}}
