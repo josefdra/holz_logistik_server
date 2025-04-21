@@ -1,28 +1,33 @@
 mod local_storage;
 
-use local_storage::contract::contract_local_storage::ContractLocalStorage;
+use local_storage::contract::contract_local_storage::{ContractLocalStorage, Contract};
 use local_storage::contract::contract_tables::ContractTable;
 use local_storage::core_local_storage::CoreLocalStorage;
-use local_storage::location::location_local_storage::LocationLocalStorage;
+use local_storage::location::location_local_storage::{LocationLocalStorage, Location};
 use local_storage::location::location_tables::{LocationSawmillJunctionTable, LocationTable};
-use local_storage::note::note_local_storage::NoteLocalStorage;
+use local_storage::note::note_local_storage::{NoteLocalStorage, Note};
 use local_storage::note::note_tables::NoteTable;
-use local_storage::photo::photo_local_storage::PhotoLocalStorage;
+use local_storage::photo::photo_local_storage::{PhotoLocalStorage, Photo};
 use local_storage::photo::photo_tables::PhotoTable;
-use local_storage::sawmill::sawmill_local_storage::SawmillLocalStorage;
+use local_storage::sawmill::sawmill_local_storage::{SawmillLocalStorage, Sawmill};
 use local_storage::sawmill::sawmill_tables::SawmillTable;
-use local_storage::shipment::shipment_local_storage::ShipmentLocalStorage;
+use local_storage::shipment::shipment_local_storage::{ShipmentLocalStorage, Shipment};
 use local_storage::shipment::shipment_tables::ShipmentTable;
-use local_storage::user::user_local_storage::UserLocalStorage;
+use local_storage::user::user_local_storage::{UserLocalStorage, User};
 use local_storage::user::user_tables::UserTable;
 
 use chrono;
 use dotenv::dotenv;
 use futures_util::{SinkExt, StreamExt};
-use rusqlite::{Result, Connection};
+use r2d2::Pool;
+use r2d2_sqlite::SqliteConnectionManager;
+use rusqlite::{Connection, Result};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::env;
+use std::fs;
+use std::path::Path;
+use std::sync::Mutex as StdMutex;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::UnboundedSender;
@@ -30,12 +35,6 @@ use tokio::time::{Duration, timeout};
 use uuid::Uuid;
 use warp::Filter;
 use warp::ws::{Message, WebSocket};
-
-use r2d2::Pool;
-use r2d2_sqlite::SqliteConnectionManager;
-use std::fs;
-use std::path::Path;
-use std::sync::Mutex as StdMutex;
 
 type DbPool = Pool<SqliteConnectionManager>;
 type DbPoolMap = Arc<StdMutex<HashMap<String, DbPool>>>;
@@ -49,19 +48,21 @@ struct Client {
 }
 
 fn initialize_database(db_path: &str) -> Result<()> {
-    let dir_path = Path::new("databases");
+    let dir_path = Path::new(&db_path).parent().unwrap_or(Path::new(""));
     if !dir_path.exists() {
-        fs::create_dir_all(dir_path).map_err(|_: std::io::Error| rusqlite::Error::ExecuteReturnedResults)?;
+        fs::create_dir_all(dir_path).map_err(|e| {
+            eprintln!("Failed to create directory: {:?}", e);
+            rusqlite::Error::ExecuteReturnedResults
+        })?;
     }
 
-    let conn = rusqlite::Connection::open(db_path)?;
+    let conn = Connection::open(db_path)?;
 
     conn.execute("PRAGMA foreign_keys = ON;", [])?;
 
     conn.execute(&UserTable::create_table(), [])?;
     conn.execute(&SawmillTable::create_table(), [])?;
     conn.execute(&ContractTable::create_table(), [])?;
-
     conn.execute(&LocationTable::create_table(), [])?;
     conn.execute(&LocationSawmillJunctionTable::create_table(), [])?;
     conn.execute(&NoteTable::create_table(), [])?;
@@ -69,12 +70,11 @@ fn initialize_database(db_path: &str) -> Result<()> {
     conn.execute(&ShipmentTable::create_table(), [])?;
 
     println!("Database initialized: {}", db_path);
-
     Ok(())
 }
 
 fn database_exists(tenant: &str) -> bool {
-    let db_path = format!("databases/{}.db", tenant);
+    let db_path = get_db_path(tenant);
     Path::new(&db_path).exists()
 }
 
@@ -83,7 +83,10 @@ fn get_db_path(tenant: &str) -> String {
 }
 
 fn get_db_pool(tenant: &str, db_pools: &DbPoolMap) -> Result<DbPool> {
-    let mut pools = db_pools.lock().unwrap();
+    let mut pools = db_pools.lock().map_err(|_| {
+        eprintln!("Failed to lock database pools");
+        rusqlite::Error::ExecuteReturnedResults
+    })?;
 
     if !pools.contains_key(tenant) {
         let db_path = get_db_path(tenant);
@@ -97,12 +100,31 @@ fn get_db_pool(tenant: &str, db_pools: &DbPoolMap) -> Result<DbPool> {
         }
 
         let manager = SqliteConnectionManager::file(&db_path);
-        let pool = Pool::new(manager).map_err(|_| rusqlite::Error::InvalidQuery)?; // Convert the error type
+        let pool = Pool::new(manager).map_err(|e| {
+            eprintln!("Failed to create connection pool: {:?}", e);
+            rusqlite::Error::InvalidQuery
+        })?;
 
         pools.insert(tenant.to_string(), pool);
     }
 
     Ok(pools.get(tenant).unwrap().clone())
+}
+
+fn get_client_db_path(client_id: &str, clients: &Clients) -> Option<String> {
+    match clients.lock() {
+        Ok(clients_lock) => {
+            if let Some(client) = clients_lock.get(client_id) {
+                Some(get_db_path(&client.db_name))
+            } else {
+                None
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to lock clients: {:?}", e);
+            None
+        }
+    }
 }
 
 async fn handle_authentication_request(
@@ -163,7 +185,7 @@ async fn handle_authentication_request(
         }
     };
 
-    let conn = match pool.get() {
+    match pool.get() {
         Ok(conn) => conn,
         Err(e) => {
             println!("Failed to get database connection: {:?}", e);
@@ -171,9 +193,64 @@ async fn handle_authentication_request(
         }
     };
 
-    // get user from userlocalstorage
+    // Update client first, so we can use the db_path later
+    {
+        match clients.lock() {
+            Ok(mut clients_lock) => {
+                if let Some(client) = clients_lock.get_mut(&client_id) {
+                    client.db_name = tenant.to_string();
+                    client.user_id = user_id.to_string();
+                } else {
+                    println!("Client {} not found", client_id);
+                    return false;
+                }
+            }
+            Err(e) => {
+                println!("Failed to lock clients: {:?}", e);
+                return false;
+            }
+        }
+    }
 
-    if user == null {
+    // Now get the DB path after updating the client
+    let db_path = match get_client_db_path(&client_id, clients) {
+        Some(path) => path,
+        None => {
+            println!("No database associated with client {}", client_id);
+            return false;
+        }
+    };
+
+    // Create a CoreLocalStorage instance
+    let core_storage = match CoreLocalStorage::new(&db_path) {
+        Ok(storage) => Arc::new(storage),
+        Err(e) => {
+            println!("Failed to create core storage: {:?}", e);
+            return false;
+        }
+    };
+
+    // Get the user by ID
+    let user_result = {
+        // Create a UserLocalStorage instance
+        let user_storage = match UserLocalStorage::new(core_storage) {
+            Ok(storage) => storage,
+            Err(e) => {
+                println!("Failed to create user storage: {:?}", e);
+                return false;
+            }
+        };
+        
+        match user_storage.get_user_by_id(user_id) {
+            Ok(user_opt) => user_opt,
+            Err(e) => {
+                println!("Failed to get user: {:?}", e);
+                return false;
+            }
+        }
+    };
+
+    if user_result.is_none() {
         println!(
             "User {} not found in database for tenant {}",
             user_id, tenant
@@ -198,14 +275,7 @@ async fn handle_authentication_request(
         return false;
     }
 
-    // Update the client entry with the database name and user ID
-    {
-        let mut clients_lock = clients.lock().unwrap();
-        if let Some(client) = clients_lock.get_mut(&client_id) {
-            client.db_name = tenant.to_string();
-            client.user_id = user_id.to_string();
-        }
-    }
+    let user_data = user_result.unwrap().to_json();
 
     let response = json!({
         "type": "authentication_response",
@@ -229,15 +299,6 @@ async fn handle_authentication_request(
     true
 }
 
-fn get_client_db_path(client_id: &str, clients: &Clients) -> Option<String> {
-    let clients_lock = clients.lock().unwrap();
-    if let Some(client) = clients_lock.get(client_id) {
-        Some(format!("databases/{}.db", client.db_name))
-    } else {
-        None
-    }
-}
-
 async fn handle_client_message(msg_type: &str, data: &Value, client_id: &str, clients: &Clients) {
     let db_path = match get_client_db_path(client_id, clients) {
         Some(path) => path,
@@ -252,51 +313,176 @@ async fn handle_client_message(msg_type: &str, data: &Value, client_id: &str, cl
         msg_type, db_path
     );
 
-    match msg_type {
-        "contract_update" => handle_contract_update(&data, &db_path),
-        "location_update" => handle_location_update(&data, &db_path),
-        "note_update" => handle_note_update(&data, &db_path),
-        "photo_update" => handle_photo_update(&data, &db_path),
-        "sawmill_update" => handle_sawmill_update(&data, &db_path),
-        "shipment_update" => handle_shipment_update(&data, &db_path),
-        "user_update" => handle_user_update(&data, &db_path),
-        _ => println!("Unknown message type: {}", msg_type),
+    // Create CoreLocalStorage instance
+    let core_storage = match CoreLocalStorage::new(&db_path) {
+        Ok(storage) => Arc::new(storage),
+        Err(e) => {
+            println!("Failed to create core storage: {:?}", e);
+            return;
+        }
     };
+
+    match msg_type {
+        "contract_update" => handle_contract_update(&data, core_storage.clone()),
+        "location_update" => handle_location_update(&data, core_storage.clone()),
+        "note_update" => handle_note_update(&data, core_storage.clone()),
+        "photo_update" => handle_photo_update(&data, core_storage.clone()),
+        "sawmill_update" => handle_sawmill_update(&data, core_storage.clone()),
+        "shipment_update" => handle_shipment_update(&data, core_storage.clone()),
+        "user_update" => handle_user_update(&data, core_storage.clone()),
+        _ => println!("Unknown message type: {}", msg_type),
+    }
 }
 
-fn handle_contract_update(data: &Value, db_path: &str) {
-    // TODO: Implement contract update logic
-    println!("Contract update received for {}: {:?}", db_path, data);
+fn handle_contract_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
+    match ContractLocalStorage::new(core_storage) {
+        Ok(contract_storage) => {
+            println!("Contract update received: {:?}", data);
+            match Contract::from_json(data) {
+                Ok(contract) => {
+                    if let Err(e) = contract_storage.save_contract(&contract) {
+                        println!("Failed to save contract: {:?}", e);
+                    }
+                },
+                Err(e) => {
+                    println!("Failed to parse contract data: {:?}", e);
+                }
+            }
+        }
+        Err(e) => {
+            println!("Failed to create contract storage: {:?}", e);
+        }
+    }
 }
 
-fn handle_location_update(data: &Value, db_path: &str) {
-    // TODO: Implement location update logic
-    println!("Location update received for {}: {:?}", db_path, data);
+fn handle_location_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
+    match LocationLocalStorage::new(core_storage) {
+        Ok(location_storage) => {
+            println!("Location update received: {:?}", data);
+            match Location::from_json(data) {
+                Ok(location) => {
+                    if let Err(e) = location_storage.save_location(&location) {
+                        println!("Failed to save location: {:?}", e);
+                    }
+                },
+                Err(e) => {
+                    println!("Failed to parse location data: {:?}", e);
+                }
+            }
+        }
+        Err(e) => {
+            println!("Failed to create location storage: {:?}", e);
+        }
+    }
 }
 
-fn handle_note_update(data: &Value, db_path: &str) {
-    // TODO: Implement note update logic
-    println!("Note update received for {}: {:?}", db_path, data);
+fn handle_note_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
+    match NoteLocalStorage::new(core_storage) {
+        Ok(note_storage) => {
+            println!("Note update received: {:?}", data);
+            match Note::from_json(data) {
+                Ok(note) => {
+                    if let Err(e) = note_storage.save_note(&note) {
+                        println!("Failed to save note: {:?}", e);
+                    }
+                },
+                Err(e) => {
+                    println!("Failed to parse note data: {:?}", e);
+                }
+            }
+        }
+        Err(e) => {
+            println!("Failed to create note storage: {:?}", e);
+        }
+    }
 }
 
-fn handle_photo_update(data: &Value, db_path: &str) {
-    // TODO: Implement photo update logic
-    println!("Photo update received for {}: {:?}", db_path, data);
+fn handle_photo_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
+    match PhotoLocalStorage::new(core_storage) {
+        Ok(photo_storage) => {
+            println!("Photo update received: {:?}", data);
+            match Photo::from_json(data) {
+                Ok(photo) => {
+                    if let Err(e) = photo_storage.save_photo(&photo) {
+                        println!("Failed to save photo: {:?}", e);
+                    }
+                },
+                Err(e) => {
+                    println!("Failed to parse photo data: {:?}", e);
+                }
+            }
+        }
+        Err(e) => {
+            println!("Failed to create photo storage: {:?}", e);
+        }
+    }
 }
 
-fn handle_sawmill_update(data: &Value, db_path: &str) {
-    // TODO: Implement sawmill update logic
-    println!("Sawmill update received for {}: {:?}", db_path, data);
+fn handle_sawmill_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
+    match SawmillLocalStorage::new(core_storage) {
+        Ok(sawmill_storage) => {
+            println!("Sawmill update received: {:?}", data);
+            match Sawmill::from_json(data) {
+                Ok(sawmill) => {
+                    if let Err(e) = sawmill_storage.save_sawmill(&sawmill) {
+                        println!("Failed to save sawmill: {:?}", e);
+                    }
+                },
+                Err(e) => {
+                    println!("Failed to parse sawmill data: {:?}", e);
+                }
+            }
+        }
+        Err(e) => {
+            println!("Failed to create sawmill storage: {:?}", e);
+        }
+    }
 }
 
-fn handle_shipment_update(data: &Value, db_path: &str) {
-    // TODO: Implement shipment update logic
-    println!("Shipment update received for {}: {:?}", db_path, data);
+fn handle_shipment_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
+    match ShipmentLocalStorage::new(core_storage) {
+        Ok(shipment_storage) => {
+            println!("Shipment update received: {:?}", data);
+            match Shipment::from_json(data) {
+                Ok(shipment) => {
+                    if let Err(e) = shipment_storage.save_shipment(&shipment) {
+                        println!("Failed to save shipment: {:?}", e);
+                    }
+                },
+                Err(e) => {
+                    println!("Failed to parse shipment data: {:?}", e);
+                }
+            }
+        }
+        Err(e) => {
+            println!("Failed to create shipment storage: {:?}", e);
+        }
+    }
 }
 
-fn handle_user_update(data: &Value, db_path: &str) {
-    // TODO: Implement user update logic
-    println!("User update received for {}: {:?}", db_path, data);
+fn handle_user_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
+    match UserLocalStorage::new(core_storage) {
+        Ok(user_storage) => {
+            println!("User update received: {:?}", data);
+            match User::from_json(data) {
+                Ok(user) => {
+                    if user.name == "" {
+                        println!("Empty user");
+                        return
+                    }
+                    if let Err(e) = user_storage.save_user(&user) {
+                        println!("Failed to save user: {:?}", e);
+                    }
+                },
+                Err(e) => {
+                    println!("Failed to parse user data: {:?}", e);
+                }
+            }
+        }
+        Err(e) => {
+            println!("Failed to create user storage: {:?}", e);
+        }
+    }
 }
 
 async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients) {
@@ -308,28 +494,58 @@ async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients)
         }
     };
 
-    // Implement basic sync response
+    // Create CoreLocalStorage instance
+    match CoreLocalStorage::new(&db_path) {
+        Ok(storage) => Arc::new(storage),
+        Err(e) => {
+            println!("Failed to create core storage: {:?}", e);
+
+            let error_response = json!({
+                "type": "sync_response",
+                "data": {
+                    "status": "error",
+                    "message": format!("Database error: {}", e)
+                },
+                "timestamp": chrono::Utc::now().to_rfc3339()
+            });
+
+            send_message(client_id, &error_response.to_string(), clients).await;
+            return;
+        }
+    };
+
+    // Implement sync response with actual data
     println!("Sync request for database: {}", db_path);
+
+    // TODO: Implement proper sync logic here using core_storage
 
     let response = json!({
         "type": "sync_response",
         "data": {
             "status": "success",
-            "message": format!("Sync request received for database {}", db_path)
+            "message": format!("Sync request processed for database {}", db_path)
+            // Add actual sync data here
         },
         "timestamp": chrono::Utc::now().to_rfc3339()
     });
+
     send_message(client_id, &response.to_string(), clients).await;
 }
 
 async fn send_message(client_id: String, msg: &str, clients: &Clients) {
-    let clients_lock = clients.lock().unwrap();
-    if let Some(client) = clients_lock.get(&client_id) {
-        if let Err(e) = client.sender.send(Message::text(msg)) {
-            println!("Error sending message to client {}: {:?}", client_id, e);
+    match clients.lock() {
+        Ok(clients_lock) => {
+            if let Some(client) = clients_lock.get(&client_id) {
+                if let Err(e) = client.sender.send(Message::text(msg)) {
+                    println!("Error sending message to client {}: {:?}", client_id, e);
+                }
+            } else {
+                println!("Client {} not found", client_id);
+            }
         }
-    } else {
-        println!("Client {} not found", client_id);
+        Err(e) => {
+            println!("Failed to lock clients: {:?}", e);
+        }
     }
 }
 
@@ -342,12 +558,18 @@ async fn send_pong(client_id: String, clients: &Clients) {
 }
 
 async fn broadcast_message(client_id: String, msg: &str, clients: &Clients) {
-    let clients_lock = clients.lock().unwrap();
-    for (id, client) in clients_lock.iter() {
-        if id != &client_id {
-            if let Err(e) = client.sender.send(Message::text(msg)) {
-                println!("Error sending message to client {}: {:?}", id, e);
+    match clients.lock() {
+        Ok(clients_lock) => {
+            for (id, client) in clients_lock.iter() {
+                if id != &client_id {
+                    if let Err(e) = client.sender.send(Message::text(msg)) {
+                        println!("Error sending message to client {}: {:?}", id, e);
+                    }
+                }
             }
+        }
+        Err(e) => {
+            println!("Failed to lock clients: {:?}", e);
         }
     }
 }
@@ -422,6 +644,16 @@ async fn handle_authenticated_client(
             }
         }
     }
+
+    match clients.lock() {
+        Ok(mut clients_lock) => {
+            clients_lock.remove(&client_id);
+            println!("Client disconnected: {}", client_id);
+        }
+        Err(e) => {
+            eprintln!("Failed to lock clients for cleanup: {:?}", e);
+        }
+    }
 }
 
 async fn handle_connection(ws: WebSocket, clients: Clients, db_pools: DbPoolMap) {
@@ -429,14 +661,22 @@ async fn handle_connection(ws: WebSocket, clients: Clients, db_pools: DbPoolMap)
     let (tx, mut rx) = mpsc::unbounded_channel();
     let client_id = format!("client-{}", Uuid::new_v4());
 
-    clients.lock().unwrap().insert(
-        client_id.clone(),
-        Client {
-            sender: tx.clone(),
-            db_name: "".to_string(),
-            user_id: "".to_string(),
-        },
-    );
+    match clients.lock() {
+        Ok(mut clients_lock) => {
+            clients_lock.insert(
+                client_id.clone(),
+                Client {
+                    sender: tx.clone(),
+                    db_name: "".to_string(),
+                    user_id: "".to_string(),
+                },
+            );
+        }
+        Err(e) => {
+            eprintln!("Failed to lock clients for insertion: {:?}", e);
+            return;
+        }
+    }
 
     tokio::task::spawn(async move {
         while let Some(message) = rx.recv().await {
@@ -464,10 +704,17 @@ async fn handle_connection(ws: WebSocket, clients: Clients, db_pools: DbPoolMap)
         handle_authenticated_client(client_id.clone(), ws_rx, clients.clone()).await;
     } else {
         eprintln!("Authentication failed for client {}", client_id);
-    }
 
-    clients.lock().unwrap().remove(&client_id);
-    println!("Client disconnected: {}", client_id);
+        match clients.lock() {
+            Ok(mut clients_lock) => {
+                clients_lock.remove(&client_id);
+                println!("Removed unauthenticated client: {}", client_id);
+            }
+            Err(e) => {
+                eprintln!("Failed to lock clients for cleanup: {:?}", e);
+            }
+        }
+    }
 }
 
 fn with_clients(
@@ -488,11 +735,15 @@ async fn main() -> Result<()> {
 
     let dir_path = Path::new("databases");
     if !dir_path.exists() {
-        fs::create_dir_all(dir_path).map_err(|_| rusqlite::Error::ExecuteReturnedResults)?;
+        fs::create_dir_all(dir_path).map_err(|e| {
+            eprintln!("Failed to create databases directory: {:?}", e);
+            rusqlite::Error::ExecuteReturnedResults
+        })?;
     }
 
     let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
     let port: u16 = port.parse().expect("PORT must be a number");
+
     let clients: Clients = Arc::new(Mutex::new(HashMap::new()));
     let db_pools: DbPoolMap = Arc::new(StdMutex::new(HashMap::new()));
 

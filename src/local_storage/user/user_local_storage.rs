@@ -1,10 +1,9 @@
 use crate::local_storage::core_local_storage::CoreLocalStorage;
 use crate::local_storage::user::user_tables::UserTable;
-use chrono::{Utc, DateTime};
+use chrono::{DateTime, Utc};
 use rusqlite::{Result, params};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,38 +61,31 @@ impl User {
 
 pub struct UserLocalStorage {
     core_storage: Arc<CoreLocalStorage>,
-    users: Arc<Mutex<HashMap<String, User>>>,
 }
 
 impl UserLocalStorage {
     pub fn new(core_storage: Arc<CoreLocalStorage>) -> Result<Self> {
         let storage = UserLocalStorage {
             core_storage: core_storage.clone(),
-            users: Arc::new(Mutex::new(HashMap::new())),
         };
-
-        storage.init()?;
 
         Ok(storage)
     }
 
-    fn init(&self) -> Result<()> {
-        let users_json = self.core_storage.get_all(UserTable::TABLE_NAME)?;
+    pub fn get_user_by_id(&self, id: &str) -> Result<Option<User>> {
+        let user_json = self.core_storage.get_by_id(UserTable::TABLE_NAME, id)?;
 
-        let mut users = HashMap::new();
-        for user_json in users_json {
-            match User::from_json(&user_json) {
-                Ok(user) => {
-                    users.insert(user.id.clone(), user);
-                }
-                Err(e) => eprintln!("Error parsing user: {}", e),
-            }
+        if user_json.is_empty() {
+            return Ok(None);
         }
 
-        let mut users_lock = self.users.lock().unwrap();
-        *users_lock = users;
-
-        Ok(())
+        match User::from_json(&user_json[0]) {
+            Ok(user) => Ok(Some(user)),
+            Err(e) => Err(rusqlite::Error::InvalidParameterName(format!(
+                "Error parsing user: {}",
+                e
+            ))),
+        }
     }
 
     pub fn get_user_updates_by_date(&self, last_edit: DateTime<Utc>) -> Result<Vec<User>> {
@@ -135,9 +127,6 @@ impl UserLocalStorage {
         let result = self
             .core_storage
             .insert_or_update(UserTable::TABLE_NAME, &json_data)?;
-
-        let mut users = self.users.lock().unwrap();
-        users.insert(user.id.clone(), user.clone());
 
         Ok(result)
     }
