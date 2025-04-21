@@ -46,10 +46,10 @@ impl ShipmentTable {
                 {} TEXT NOT NULL,
                 {} TEXT NOT NULL,
                 {} TEXT NOT NULL,
-                FOREIGN KEY ({}) REFERENCES {}({}),
-                FOREIGN KEY ({}) REFERENCES {}({}),
-                FOREIGN KEY ({}) REFERENCES {}({}),
-                FOREIGN KEY ({}) REFERENCES {}({})
+                FOREIGN KEY ({}) REFERENCES users(id),
+                FOREIGN KEY ({}) REFERENCES contracts(id),
+                FOREIGN KEY ({}) REFERENCES sawmills(id),
+                FOREIGN KEY ({}) REFERENCES locations(id)
             )",
             Self::TABLE_NAME,
             Self::COLUMN_ID,
@@ -61,10 +61,10 @@ impl ShipmentTable {
             Self::COLUMN_CONTRACT_ID,
             Self::COLUMN_SAWMILL_ID,
             Self::COLUMN_LOCATION_ID,
-            Self::COLUMN_USER_ID, UserTable::TABLE_NAME, UserTable::COLUMN_ID,
-            Self::COLUMN_CONTRACT_ID, ContractTable::TABLE_NAME, ContractTable::COLUMN_ID,
-            Self::COLUMN_SAWMILL_ID, SawmillTable::TABLE_NAME, LocationTable::COLUMN_ID,
-            Self::COLUMN_LOCATION_ID, LocationTable::TABLE_NAME, LocationTable::COLUMN_ID
+            Self::COLUMN_USER_ID,
+            Self::COLUMN_CONTRACT_ID,
+            Self::COLUMN_SAWMILL_ID,
+            Self::COLUMN_LOCATION_ID
         )
     }
 }

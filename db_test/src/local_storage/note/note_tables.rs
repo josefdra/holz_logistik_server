@@ -26,14 +26,14 @@ impl NoteTable {
                 {} TEXT NOT NULL,
                 {} TEXT NOT NULL,
                 {} TEXT NOT NULL,
-                FOREIGN KEY ({}) REFERENCES {}({})
+                FOREIGN KEY ({}) REFERENCES users(id)
             )",
             Self::TABLE_NAME,
             Self::COLUMN_ID,
             Self::COLUMN_LAST_EDIT,
             Self::COLUMN_TEXT,
             Self::COLUMN_USER_ID,
-            Self::COLUMN_USER_ID, UserTable::TABLE_NAME, UserTable::COLUMN_ID
+            Self::COLUMN_USER_ID
         )
     }
 }

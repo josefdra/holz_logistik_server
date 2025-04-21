@@ -1,5 +1,6 @@
 use rusqlite::{params, Connection, Result};
 use serde_json;
+use base64::prelude::*;
 
 pub struct CoreLocalStorage {
     connection: Connection,
@@ -19,21 +20,26 @@ impl CoreLocalStorage {
         let query = format!("SELECT * FROM {}", table_name);
         let mut stmt = self.connection.prepare(&query)?;
         
-        let mut rows = stmt.query([])?;
-        let mut results = Vec::new();
+        let column_names: Vec<String> = stmt
+            .column_names()
+            .into_iter()
+            .map(|name| name.to_string())
+            .collect();
         
-        while let Some(row) = rows.next()? {
-            let column_count = row.column_names().len();
-            let column_names = row.column_names();
-            
+        let rows = stmt.query_map([], |row| {
             let mut map = serde_json::Map::new();
-            for i in 0..column_count {
-                let column_name = column_names[i];
+            for (i, column_name) in column_names.iter().enumerate() {
                 let value = self.get_value_from_row(row, i)?;
                 map.insert(column_name.to_string(), value);
             }
-            
-            results.push(serde_json::Value::Object(map));
+            Ok(serde_json::Value::Object(map))
+        })?;
+        
+        let mut results = Vec::new();
+        for row_result in rows {
+            if let Ok(row_value) = row_result {
+                results.push(row_value);
+            }
         }
         
         Ok(results)
@@ -43,21 +49,26 @@ impl CoreLocalStorage {
         let query = format!("SELECT * FROM {} WHERE id = ?", table_name);
         let mut stmt = self.connection.prepare(&query)?;
         
-        let mut rows = stmt.query(params![id])?;
-        let mut results = Vec::new();
+        let column_names: Vec<String> = stmt
+            .column_names()
+            .into_iter()
+            .map(|name| name.to_string())
+            .collect();
         
-        while let Some(row) = rows.next()? {
-            let column_count = row.column_names().len();
-            let column_names = row.column_names();
-            
+        let rows = stmt.query_map(params![id], |row| {
             let mut map = serde_json::Map::new();
-            for i in 0..column_count {
-                let column_name = column_names[i];
+            for (i, column_name) in column_names.iter().enumerate() {
                 let value = self.get_value_from_row(row, i)?;
                 map.insert(column_name.to_string(), value);
             }
-            
-            results.push(serde_json::Value::Object(map));
+            Ok(serde_json::Value::Object(map))
+        })?;
+        
+        let mut results = Vec::new();
+        for row_result in rows {
+            if let Ok(row_value) = row_result {
+                results.push(row_value);
+            }
         }
         
         Ok(results)
@@ -67,21 +78,26 @@ impl CoreLocalStorage {
         let query = format!("SELECT * FROM {} WHERE {} = ?", table_name, column_name);
         let mut stmt = self.connection.prepare(&query)?;
         
-        let mut rows = stmt.query(params![value])?;
-        let mut results = Vec::new();
+        let column_names: Vec<String> = stmt
+            .column_names()
+            .into_iter()
+            .map(|name| name.to_string())
+            .collect();
         
-        while let Some(row) = rows.next()? {
-            let column_count = row.column_names().len();
-            let column_names = row.column_names();
-            
+        let rows = stmt.query_map(params![value], |row| {
             let mut map = serde_json::Map::new();
-            for i in 0..column_count {
-                let column_name = column_names[i];
+            for (i, column_name) in column_names.iter().enumerate() {
                 let value = self.get_value_from_row(row, i)?;
                 map.insert(column_name.to_string(), value);
             }
-            
-            results.push(serde_json::Value::Object(map));
+            Ok(serde_json::Value::Object(map))
+        })?;
+        
+        let mut results = Vec::new();
+        for row_result in rows {
+            if let Ok(row_value) = row_result {
+                results.push(row_value);
+            }
         }
         
         Ok(results)
@@ -89,7 +105,7 @@ impl CoreLocalStorage {
     
     // Helper method to extract value from a row
     fn get_value_from_row(&self, row: &rusqlite::Row, index: usize) -> Result<serde_json::Value> {
-        let column_type = row.column_type(index)?;
+        let column_type = row.get_ref(index)?.data_type();
         
         match column_type {
             rusqlite::types::Type::Null => Ok(serde_json::Value::Null),
@@ -111,7 +127,7 @@ impl CoreLocalStorage {
             },
             rusqlite::types::Type::Blob => {
                 let val: Vec<u8> = row.get(index)?;
-                let encoded = base64::encode(&val);
+                let encoded = BASE64_STANDARD.encode(&val);
                 Ok(serde_json::Value::String(encoded))
             },
         }
@@ -227,7 +243,7 @@ impl CoreLocalStorage {
 // Helper function to convert serde_json value to ToSql param
 fn json_to_param(value: &serde_json::Value) -> Box<dyn rusqlite::ToSql> {
     match value {
-        serde_json::Value::Null => Box::new(()),
+        serde_json::Value::Null => Box::new(Option::<String>::None),
         serde_json::Value::Bool(b) => Box::new(*b),
         serde_json::Value::Number(n) => {
             if n.is_i64() {
@@ -235,7 +251,7 @@ fn json_to_param(value: &serde_json::Value) -> Box<dyn rusqlite::ToSql> {
             } else if n.is_f64() {
                 Box::new(n.as_f64().unwrap())
             } else {
-                Box::new(())
+                Box::new(Option::<String>::None)
             }
         },
         serde_json::Value::String(s) => Box::new(s.clone()),

@@ -74,7 +74,7 @@ impl LocationTable {
                 {} REAL NOT NULL,
                 {} INTEGER NOT NULL,
                 {} TEXT NOT NULL,
-                FOREIGN KEY ({}) REFERENCES {}({})
+                FOREIGN KEY ({}) REFERENCES contracts(id)
             )",
             Self::TABLE_NAME,
             Self::COLUMN_ID,
@@ -93,7 +93,7 @@ impl LocationTable {
             Self::COLUMN_CURRENT_OVERSIZE_QUANTITY,
             Self::COLUMN_CURRENT_PIECE_COUNT,
             Self::COLUMN_CONTRACT_ID,
-            Self::COLUMN_CONTRACT_ID, ContractTable::TABLE_NAME, ContractTable::COLUMN_ID
+            Self::COLUMN_CONTRACT_ID
         )
     }
 }
@@ -123,16 +123,16 @@ impl LocationSawmillJunctionTable {
                 {} TEXT NOT NULL,
                 {} INTEGER NOT NULL,
                 PRIMARY KEY ({}, {}, {}),
-                FOREIGN KEY ({}) REFERENCES {}({}) ON DELETE CASCADE,
-                FOREIGN KEY ({}) REFERENCES {}({}) ON DELETE CASCADE
+                FOREIGN KEY ({}) REFERENCES locations(id) ON DELETE CASCADE,
+                FOREIGN KEY ({}) REFERENCES sawmills(id) ON DELETE CASCADE
             )",
             Self::TABLE_NAME,
             Self::COLUMN_LOCATION_ID,
             Self::COLUMN_SAWMILL_ID,
             Self::COLUMN_IS_OVERSIZE,
             Self::COLUMN_LOCATION_ID, Self::COLUMN_SAWMILL_ID, Self::COLUMN_IS_OVERSIZE,
-            Self::COLUMN_LOCATION_ID, LocationTable::TABLE_NAME, LocationTable::COLUMN_ID,
-            Self::COLUMN_SAWMILL_ID, SawmillTable::TABLE_NAME, SawmillTable::COLUMN_ID
+            Self::COLUMN_LOCATION_ID,
+            Self::COLUMN_SAWMILL_ID
         )
     }
 }

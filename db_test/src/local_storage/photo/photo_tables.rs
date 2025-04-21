@@ -26,14 +26,14 @@ impl PhotoTable {
                 {} TEXT NOT NULL,
                 {} BLOB NOT NULL,
                 {} TEXT NOT NULL,
-                FOREIGN KEY ({}) REFERENCES {}({})
+                FOREIGN KEY ({}) REFERENCES locations(id)
             )",
             Self::TABLE_NAME,
             Self::COLUMN_ID,
             Self::COLUMN_LAST_EDIT,
             Self::COLUMN_PHOTO,
             Self::COLUMN_LOCATION_ID,
-            Self::COLUMN_LOCATION_ID, LocationTable::TABLE_NAME, LocationTable::COLUMN_ID
+            Self::COLUMN_LOCATION_ID
         )
     }
 }
