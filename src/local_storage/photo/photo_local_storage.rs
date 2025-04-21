@@ -1,6 +1,5 @@
 use crate::local_storage::core_local_storage::CoreLocalStorage;
 use crate::local_storage::photo::photo_tables::PhotoTable;
-use base64::prelude::*;
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Result};
 use serde::{Deserialize, Serialize};
@@ -26,23 +25,15 @@ impl Photo {
     }
 
     pub fn to_json(&self) -> serde_json::Value {
-        let encoded_photo = BASE64_STANDARD.encode(&self.photo_file);
         serde_json::json!({
             "id": self.id,
             "lastEdit": self.last_edit,
-            "photoFile": encoded_photo,
+            "photoFile": self.photo_file,
             "locationId": self.location_id,
         })
     }
 
     pub fn from_json(json: &serde_json::Value) -> Result<Self, serde_json::Error> {
-        let encoded_photo = json
-            .get("photoFile")
-            .and_then(|v| v.as_str())
-            .unwrap_or_default();
-
-        let decoded_photo = BASE64_STANDARD.decode(encoded_photo).unwrap_or_default();
-
         Ok(Photo {
             id: json
                 .get("id")
@@ -54,7 +45,15 @@ impl Photo {
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string(),
-            photo_file: decoded_photo,
+            photo_file: json
+                .get("photoFile")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_u64().map(|n| n as u8))
+                        .collect::<Vec<u8>>()
+                })
+                .unwrap_or_default(),
             location_id: json
                 .get("locationId")
                 .and_then(|v| v.as_str())
