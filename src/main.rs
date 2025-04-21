@@ -1,19 +1,19 @@
 mod local_storage;
 
-use local_storage::contract::contract_local_storage::{ContractLocalStorage, Contract};
+use local_storage::contract::contract_local_storage::{Contract, ContractLocalStorage};
 use local_storage::contract::contract_tables::ContractTable;
 use local_storage::core_local_storage::CoreLocalStorage;
-use local_storage::location::location_local_storage::{LocationLocalStorage, Location};
+use local_storage::location::location_local_storage::{Location, LocationLocalStorage};
 use local_storage::location::location_tables::{LocationSawmillJunctionTable, LocationTable};
-use local_storage::note::note_local_storage::{NoteLocalStorage, Note};
+use local_storage::note::note_local_storage::{Note, NoteLocalStorage};
 use local_storage::note::note_tables::NoteTable;
-use local_storage::photo::photo_local_storage::{PhotoLocalStorage, Photo};
+use local_storage::photo::photo_local_storage::{Photo, PhotoLocalStorage};
 use local_storage::photo::photo_tables::PhotoTable;
-use local_storage::sawmill::sawmill_local_storage::{SawmillLocalStorage, Sawmill};
+use local_storage::sawmill::sawmill_local_storage::{Sawmill, SawmillLocalStorage};
 use local_storage::sawmill::sawmill_tables::SawmillTable;
-use local_storage::shipment::shipment_local_storage::{ShipmentLocalStorage, Shipment};
+use local_storage::shipment::shipment_local_storage::{Shipment, ShipmentLocalStorage};
 use local_storage::shipment::shipment_tables::ShipmentTable;
-use local_storage::user::user_local_storage::{UserLocalStorage, User};
+use local_storage::user::user_local_storage::{User, UserLocalStorage};
 use local_storage::user::user_tables::UserTable;
 
 use chrono;
@@ -240,7 +240,7 @@ async fn handle_authentication_request(
                 return false;
             }
         };
-        
+
         match user_storage.get_user_by_id(user_id) {
             Ok(user_opt) => user_opt,
             Err(e) => {
@@ -343,7 +343,7 @@ fn handle_contract_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
                     if let Err(e) = contract_storage.save_contract(&contract) {
                         println!("Failed to save contract: {:?}", e);
                     }
-                },
+                }
                 Err(e) => {
                     println!("Failed to parse contract data: {:?}", e);
                 }
@@ -364,7 +364,7 @@ fn handle_location_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
                     if let Err(e) = location_storage.save_location(&location) {
                         println!("Failed to save location: {:?}", e);
                     }
-                },
+                }
                 Err(e) => {
                     println!("Failed to parse location data: {:?}", e);
                 }
@@ -385,7 +385,7 @@ fn handle_note_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
                     if let Err(e) = note_storage.save_note(&note) {
                         println!("Failed to save note: {:?}", e);
                     }
-                },
+                }
                 Err(e) => {
                     println!("Failed to parse note data: {:?}", e);
                 }
@@ -406,7 +406,7 @@ fn handle_photo_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
                     if let Err(e) = photo_storage.save_photo(&photo) {
                         println!("Failed to save photo: {:?}", e);
                     }
-                },
+                }
                 Err(e) => {
                     println!("Failed to parse photo data: {:?}", e);
                 }
@@ -427,7 +427,7 @@ fn handle_sawmill_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
                     if let Err(e) = sawmill_storage.save_sawmill(&sawmill) {
                         println!("Failed to save sawmill: {:?}", e);
                     }
-                },
+                }
                 Err(e) => {
                     println!("Failed to parse sawmill data: {:?}", e);
                 }
@@ -448,7 +448,7 @@ fn handle_shipment_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
                     if let Err(e) = shipment_storage.save_shipment(&shipment) {
                         println!("Failed to save shipment: {:?}", e);
                     }
-                },
+                }
                 Err(e) => {
                     println!("Failed to parse shipment data: {:?}", e);
                 }
@@ -468,12 +468,12 @@ fn handle_user_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
                 Ok(user) => {
                     if user.name == "" {
                         println!("Empty user");
-                        return
+                        return;
                     }
                     if let Err(e) = user_storage.save_user(&user) {
                         println!("Failed to save user: {:?}", e);
                     }
-                },
+                }
                 Err(e) => {
                     println!("Failed to parse user data: {:?}", e);
                 }
@@ -485,51 +485,105 @@ fn handle_user_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
     }
 }
 
-async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients) {
+async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients) -> bool {
     let db_path = match get_client_db_path(&client_id, clients) {
         Some(path) => path,
         None => {
             println!("No database associated with client {}", client_id);
-            return;
+            return true;
         }
     };
 
-    // Create CoreLocalStorage instance
-    match CoreLocalStorage::new(&db_path) {
+    let core_storage = match CoreLocalStorage::new(&db_path) {
         Ok(storage) => Arc::new(storage),
         Err(e) => {
             println!("Failed to create core storage: {:?}", e);
-
-            let error_response = json!({
-                "type": "sync_response",
-                "data": {
-                    "status": "error",
-                    "message": format!("Database error: {}", e)
-                },
-                "timestamp": chrono::Utc::now().to_rfc3339()
-            });
-
-            send_message(client_id, &error_response.to_string(), clients).await;
-            return;
+            return true;
         }
     };
 
-    // Implement sync response with actual data
-    println!("Sync request for database: {}", db_path);
+    let last_contract_sync = data
+        .get("last_contract_sync")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let last_location_sync = data
+        .get("last_location_sync")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let last_sawmill_sync = data
+        .get("last_sawmill_sync")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let last_note_sync = data
+        .get("last_note_sync")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let last_photo_sync = data
+        .get("last_photo_sync")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let last_shipment_sync = data
+        .get("last_shipment_sync")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let last_user_sync = data
+        .get("last_user_sync")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
 
-    // TODO: Implement proper sync logic here using core_storage
+    let mut all_syncs_completed = true;
 
-    let response = json!({
-        "type": "sync_response",
-        "data": {
-            "status": "success",
-            "message": format!("Sync request processed for database {}", db_path)
-            // Add actual sync data here
-        },
-        "timestamp": chrono::Utc::now().to_rfc3339()
-    });
+    all_syncs_completed &= send_user_data(
+        last_user_sync,
+        client_id.clone(),
+        core_storage.clone(),
+        clients,
+    )
+    .await;
+    all_syncs_completed &= send_sawmill_data(
+        last_sawmill_sync,
+        client_id.clone(),
+        core_storage.clone(),
+        clients,
+    )
+    .await;
+    all_syncs_completed &= send_contract_data(
+        last_contract_sync,
+        client_id.clone(),
+        core_storage.clone(),
+        clients,
+    )
+    .await;
+    all_syncs_completed &= send_photo_data(
+        last_photo_sync,
+        client_id.clone(),
+        core_storage.clone(),
+        clients,
+    )
+    .await;
+    all_syncs_completed &= send_note_data(
+        last_note_sync,
+        client_id.clone(),
+        core_storage.clone(),
+        clients,
+    )
+    .await;
+    all_syncs_completed &= send_location_data(
+        last_location_sync,
+        client_id.clone(),
+        core_storage.clone(),
+        clients,
+    )
+    .await;
+    all_syncs_completed &= send_shipment_data(
+        last_shipment_sync,
+        client_id.clone(),
+        core_storage.clone(),
+        clients,
+    )
+    .await;
 
-    send_message(client_id, &response.to_string(), clients).await;
+    all_syncs_completed
 }
 
 async fn send_message(client_id: String, msg: &str, clients: &Clients) {
@@ -630,7 +684,11 @@ async fn handle_authenticated_client(
                         if msg_type == "ping" {
                             send_pong(client_id.clone(), &clients).await;
                         } else if msg_type == "sync_request" {
-                            handle_sync_request(&data, client_id.clone(), &clients).await;
+                            let mut sync_completed = false;
+                            while !sync_completed {
+                                sync_completed =
+                                    handle_sync_request(&data, client_id.clone(), &clients).await;
+                            }
                         } else {
                             handle_client_message(msg_type, &data, &client_id, &clients).await;
                             broadcast_message(client_id.clone(), text, &clients).await;

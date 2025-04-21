@@ -1,10 +1,9 @@
 use crate::local_storage::core_local_storage::CoreLocalStorage;
 use crate::local_storage::sawmill::sawmill_tables::SawmillTable;
-use chrono::{Utc, DateTime};
+use chrono::{DateTime, Utc};
 use rusqlite::{Result, params};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Sawmill {
@@ -14,14 +13,6 @@ pub struct Sawmill {
 }
 
 impl Sawmill {
-    pub fn new(name: String) -> Self {
-        Sawmill {
-            id: Uuid::new_v4().to_string(),
-            last_edit: Utc::now().to_rfc3339(),
-            name,
-        }
-    }
-
     pub fn to_json(&self) -> serde_json::Value {
         serde_json::json!({
             "id": self.id,

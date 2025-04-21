@@ -4,7 +4,6 @@ use chrono::{DateTime, Utc};
 use rusqlite::{Result, params};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
@@ -15,15 +14,6 @@ pub struct User {
 }
 
 impl User {
-    pub fn new(name: String, role: i32) -> Self {
-        User {
-            id: Uuid::new_v4().to_string(),
-            last_edit: Utc::now().to_rfc3339(),
-            role,
-            name,
-        }
-    }
-
     pub fn to_json(&self) -> serde_json::Value {
         serde_json::json!({
             "id": self.id,

@@ -1,10 +1,9 @@
 use crate::local_storage::core_local_storage::CoreLocalStorage;
 use crate::local_storage::photo::photo_tables::PhotoTable;
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Result};
+use rusqlite::{Result, params};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Photo {
@@ -15,15 +14,6 @@ pub struct Photo {
 }
 
 impl Photo {
-    pub fn new(photo_file: Vec<u8>, location_id: String) -> Self {
-        Photo {
-            id: Uuid::new_v4().to_string(),
-            last_edit: Utc::now().to_rfc3339(),
-            photo_file,
-            location_id,
-        }
-    }
-
     pub fn to_json(&self) -> serde_json::Value {
         serde_json::json!({
             "id": self.id,

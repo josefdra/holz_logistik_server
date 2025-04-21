@@ -130,7 +130,9 @@ impl LocationSawmillJunctionTable {
             Self::COLUMN_LOCATION_ID,
             Self::COLUMN_SAWMILL_ID,
             Self::COLUMN_IS_OVERSIZE,
-            Self::COLUMN_LOCATION_ID, Self::COLUMN_SAWMILL_ID, Self::COLUMN_IS_OVERSIZE,
+            Self::COLUMN_LOCATION_ID,
+            Self::COLUMN_SAWMILL_ID,
+            Self::COLUMN_IS_OVERSIZE,
             Self::COLUMN_LOCATION_ID,
             Self::COLUMN_SAWMILL_ID
         )

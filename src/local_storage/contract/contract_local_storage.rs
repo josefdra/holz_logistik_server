@@ -1,10 +1,9 @@
 use crate::local_storage::contract::contract_tables::ContractTable;
 use crate::local_storage::core_local_storage::CoreLocalStorage;
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Result};
+use rusqlite::{Result, params};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Contract {
@@ -21,21 +20,6 @@ pub struct Contract {
 }
 
 impl Contract {
-    pub fn new(title: String) -> Self {
-        Contract {
-            id: Uuid::new_v4().to_string(),
-            done: false,
-            last_edit: Utc::now().to_rfc3339(),
-            title,
-            additional_info: String::new(),
-            start_date: Utc::now().to_rfc3339(),
-            end_date: Utc::now().to_rfc3339(),
-            available_quantity: 0.0,
-            booked_quantity: 0.0,
-            shipped_quantity: 0.0,
-        }
-    }
-
     pub fn to_json(&self) -> serde_json::Value {
         serde_json::json!({
             "id": self.id,
@@ -115,10 +99,7 @@ impl ContractLocalStorage {
         Ok(storage)
     }
 
-    pub fn get_contract_updates_by_date(
-        &self,
-        last_edit: DateTime<Utc>,
-    ) -> Result<Vec<Contract>> {
+    pub fn get_contract_updates_by_date(&self, last_edit: DateTime<Utc>) -> Result<Vec<Contract>> {
         let query = format!(
             "SELECT * FROM {} WHERE lastEdit >= ?",
             ContractTable::TABLE_NAME
@@ -127,36 +108,31 @@ impl ContractLocalStorage {
         let conn = self.core_storage.get_connection();
         let mut stmt = conn.prepare(&query)?;
 
-        let rows = stmt.query_map(
-            params![
-                last_edit.to_rfc3339(),
-            ],
-            |row| {
-                let id: String = row.get(0)?;
-                let done: i64 = row.get(1)?;
-                let last_edit: String = row.get(2)?;
-                let title: String = row.get(3)?;
-                let additional_info: String = row.get(4)?;
-                let start_date: String = row.get(5)?;
-                let end_date: String = row.get(6)?;
-                let available_quantity: f64 = row.get(7)?;
-                let booked_quantity: f64 = row.get(8)?;
-                let shipped_quantity: f64 = row.get(9)?;
+        let rows = stmt.query_map(params![last_edit.to_rfc3339(),], |row| {
+            let id: String = row.get(0)?;
+            let done: i64 = row.get(1)?;
+            let last_edit: String = row.get(2)?;
+            let title: String = row.get(3)?;
+            let additional_info: String = row.get(4)?;
+            let start_date: String = row.get(5)?;
+            let end_date: String = row.get(6)?;
+            let available_quantity: f64 = row.get(7)?;
+            let booked_quantity: f64 = row.get(8)?;
+            let shipped_quantity: f64 = row.get(9)?;
 
-                Ok(Contract {
-                    id,
-                    done: done != 0,
-                    last_edit,
-                    title,
-                    additional_info,
-                    start_date,
-                    end_date,
-                    available_quantity,
-                    booked_quantity,
-                    shipped_quantity,
-                })
-            },
-        )?;
+            Ok(Contract {
+                id,
+                done: done != 0,
+                last_edit,
+                title,
+                additional_info,
+                start_date,
+                end_date,
+                available_quantity,
+                booked_quantity,
+                shipped_quantity,
+            })
+        })?;
 
         let mut contracts = Vec::new();
         for row in rows {

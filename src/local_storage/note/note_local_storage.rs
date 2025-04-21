@@ -1,10 +1,9 @@
 use crate::local_storage::core_local_storage::CoreLocalStorage;
 use crate::local_storage::note::note_tables::NoteTable;
-use chrono::{Utc, DateTime};
+use chrono::{DateTime, Utc};
 use rusqlite::{Result, params};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Note {
@@ -15,15 +14,6 @@ pub struct Note {
 }
 
 impl Note {
-    pub fn new(text: String, user_id: String) -> Self {
-        Note {
-            id: Uuid::new_v4().to_string(),
-            last_edit: Utc::now().to_rfc3339(),
-            text,
-            user_id,
-        }
-    }
-
     pub fn to_json(&self) -> serde_json::Value {
         serde_json::json!({
             "id": self.id,

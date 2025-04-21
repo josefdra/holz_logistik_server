@@ -3,10 +3,9 @@ use crate::local_storage::location::location_tables::{
     LocationSawmillJunctionTable, LocationTable,
 };
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Result};
+use rusqlite::{Result, params};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Location {
@@ -31,29 +30,6 @@ pub struct Location {
 }
 
 impl Location {
-    pub fn new(contract_id: String) -> Self {
-        Location {
-            id: Uuid::new_v4().to_string(),
-            done: false,
-            started: false,
-            last_edit: Utc::now().to_rfc3339(),
-            latitude: 0.0,
-            longitude: 0.0,
-            partie_nr: String::new(),
-            date: Utc::now().to_rfc3339(),
-            additional_info: String::new(),
-            initial_quantity: 0.0,
-            initial_oversize_quantity: 0.0,
-            initial_piece_count: 0,
-            current_quantity: 0.0,
-            current_oversize_quantity: 0.0,
-            current_piece_count: 0,
-            contract_id,
-            sawmill_ids: Vec::new(),
-            oversize_sawmill_ids: Vec::new(),
-        }
-    }
-
     pub fn to_json(&self) -> serde_json::Value {
         serde_json::json!({
             "id": self.id,
@@ -242,10 +218,7 @@ impl LocationLocalStorage {
         Ok(sawmill_ids)
     }
 
-    pub fn get_location_updates_by_date(
-        &self,
-        last_edit: DateTime<Utc>,
-    ) -> Result<Vec<Location>> {
+    pub fn get_location_updates_by_date(&self, last_edit: DateTime<Utc>) -> Result<Vec<Location>> {
         let query = format!(
             "SELECT * FROM {} WHERE {} >= ?",
             LocationTable::TABLE_NAME,
