@@ -12,8 +12,6 @@ use std::sync::Arc;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn run_test_suite() {
         // This is a meta-test that ensures our test.rs file is included in the build

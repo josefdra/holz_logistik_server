@@ -26,19 +26,22 @@ impl Photo {
     }
 
     pub fn to_json(&self) -> serde_json::Value {
-        let photo_base64 = BASE64_STANDARD.encode(&self.photo_file);
-
+        let encoded_photo = BASE64_STANDARD.encode(&self.photo_file);
         serde_json::json!({
             "id": self.id,
             "lastEdit": self.last_edit,
-            "photoFile": photo_base64,
+            "photoFile": encoded_photo,
             "locationId": self.location_id,
         })
     }
 
     pub fn from_json(json: &serde_json::Value) -> Result<Self, serde_json::Error> {
-        let photo_base64 = json.get("photoFile").and_then(|v| v.as_str()).unwrap_or("");
-        let photo_file = BASE64_STANDARD.decode(photo_base64).unwrap_or_default();
+        let encoded_photo = json
+            .get("photoFile")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default();
+
+        let decoded_photo = BASE64_STANDARD.decode(encoded_photo).unwrap_or_default();
 
         Ok(Photo {
             id: json
@@ -51,7 +54,7 @@ impl Photo {
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string(),
-            photo_file,
+            photo_file: decoded_photo,
             location_id: json
                 .get("locationId")
                 .and_then(|v| v.as_str())
@@ -76,8 +79,7 @@ impl PhotoLocalStorage {
 
     pub fn get_photo_updates_by_date(&self, last_edit: DateTime<Utc>) -> Result<Vec<Photo>> {
         let query = format!(
-            "SELECT {} FROM {} WHERE {} >= ?",
-            PhotoTable::COLUMN_ID,
+            "SELECT * FROM {} WHERE {} >= ?",
             PhotoTable::TABLE_NAME,
             PhotoTable::COLUMN_LAST_EDIT,
         );
@@ -103,7 +105,7 @@ impl PhotoLocalStorage {
         for row in rows {
             match row {
                 Ok(photo) => photos.push(photo),
-                Err(e) => eprintln!("Error fetching photo ID: {}", e),
+                Err(e) => eprintln!("Error fetching photo: {}", e),
             }
         }
 

@@ -242,29 +242,6 @@ impl LocationLocalStorage {
         Ok(sawmill_ids)
     }
 
-    fn add_sawmills_to_locations(
-        &self,
-        locations_json: Vec<serde_json::Value>,
-    ) -> Result<Vec<Location>> {
-        let mut locations = Vec::new();
-
-        for location_json in locations_json {
-            match Location::from_json(&location_json) {
-                Ok(mut location) => {
-                    let sawmill_ids = self.get_sawmill_ids(&location.id, false)?;
-                    let oversize_sawmill_ids = self.get_sawmill_ids(&location.id, true)?;
-
-                    location = location.copy_with(Some(sawmill_ids), Some(oversize_sawmill_ids));
-
-                    locations.push(location);
-                }
-                Err(e) => eprintln!("Error parsing location: {}", e),
-            }
-        }
-
-        Ok(locations)
-    }
-
     pub fn get_location_updates_by_date(
         &self,
         last_edit: DateTime<Utc>,

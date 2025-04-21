@@ -3,7 +3,6 @@ pub mod local_storage;
 #[cfg(test)]
 pub mod test;
 
-use local_storage::core_local_storage::CoreLocalStorage;
 use local_storage::contract::contract_tables::ContractTable;
 use local_storage::location::location_tables::{LocationTable, LocationSawmillJunctionTable};
 use local_storage::note::note_tables::NoteTable;
