@@ -39,7 +39,7 @@ impl ContractTable {
     /// SQL statement for creating the contracts table with the defined schema.
     pub fn create_table() -> String {
         format!(
-            "CREATE TABLE {} (
+            "CREATE TABLE IF NOT EXISTS {} (
                 {} TEXT PRIMARY KEY NOT NULL,
                 {} INTEGER NOT NULL,
                 {} TEXT NOT NULL,

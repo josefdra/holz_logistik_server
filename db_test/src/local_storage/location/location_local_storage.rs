@@ -5,7 +5,7 @@ use crate::local_storage::location::location_tables::{
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Result};
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -202,27 +202,15 @@ impl Location {
 
 pub struct LocationLocalStorage {
     core_storage: Arc<CoreLocalStorage>,
-    active_locations: Arc<Mutex<Vec<Location>>>,
 }
 
 impl LocationLocalStorage {
     pub fn new(core_storage: Arc<CoreLocalStorage>) -> Result<Self> {
         let storage = LocationLocalStorage {
             core_storage: core_storage.clone(),
-            active_locations: Arc::new(Mutex::new(Vec::new())),
         };
 
-        // Initialize active locations
-        storage.init()?;
-
         Ok(storage)
-    }
-
-    fn init(&self) -> Result<()> {
-        let active_locations = self.get_locations_by_condition(false)?;
-        let mut locations_lock = self.active_locations.lock().unwrap();
-        *locations_lock = active_locations;
-        Ok(())
     }
 
     fn get_sawmill_ids(&self, id: &str, is_oversize: bool) -> Result<Vec<String>> {
@@ -277,36 +265,20 @@ impl LocationLocalStorage {
         Ok(locations)
     }
 
-    pub fn get_locations_by_condition(&self, is_done: bool) -> Result<Vec<Location>> {
-        let done_value = if is_done { "1" } else { "0" };
-
-        let locations_json = self.core_storage.get_by_column(
-            LocationTable::TABLE_NAME,
-            LocationTable::COLUMN_DONE,
-            done_value,
-        )?;
-
-        self.add_sawmills_to_locations(locations_json)
-    }
-
-    pub fn get_finished_locations_by_date(
+    pub fn get_location_updates_by_date(
         &self,
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
+        last_edit: DateTime<Utc>,
     ) -> Result<Vec<Location>> {
         let query = format!(
-            "SELECT * FROM {} WHERE {} = 1 AND ({} >= ? AND {} <= ?)",
+            "SELECT * FROM {} WHERE {} >= ?",
             LocationTable::TABLE_NAME,
-            LocationTable::COLUMN_DONE,
-            LocationTable::COLUMN_DATE,
-            LocationTable::COLUMN_DATE
+            LocationTable::COLUMN_LAST_EDIT,
         );
 
         let conn = self.core_storage.get_connection();
         let mut stmt = conn.prepare(&query)?;
 
-        let rows = stmt.query_map(params![start.to_rfc3339(), end.to_rfc3339()], |row| {
-            // This is a simplified version. We just need location ID to fetch full data
+        let rows = stmt.query_map(params![last_edit.to_rfc3339()], |row| {
             let id: String = row.get(0)?;
             Ok(id)
         })?;
@@ -370,71 +342,32 @@ impl LocationLocalStorage {
     }
 
     fn insert_or_update_location(&self, location: &Location) -> Result<i64> {
-        // First, delete any existing junction records for this location
         self.core_storage.delete_by_column(
             LocationSawmillJunctionTable::TABLE_NAME,
             LocationSawmillJunctionTable::COLUMN_LOCATION_ID,
             &location.id,
         )?;
 
-        // Insert normal sawmill junctions
         for sawmill_id in &location.sawmill_ids {
             self.insert_location_sawmill_junction(&location.id, sawmill_id, false)?;
         }
 
-        // Insert oversize sawmill junctions
         for sawmill_id in &location.oversize_sawmill_ids {
             self.insert_location_sawmill_junction(&location.id, sawmill_id, true)?;
         }
 
-        // Create a location JSON object without the sawmill IDs for database storage
         let mut location_data = location.to_json();
         if let serde_json::Value::Object(ref mut map) = location_data {
             map.remove("sawmillIds");
             map.remove("oversizeSawmillIds");
         }
 
-        // Insert or update the location
         self.core_storage
             .insert_or_update(LocationTable::TABLE_NAME, &location_data)
     }
 
     pub fn save_location(&self, location: &Location) -> Result<i64> {
         let result = self.insert_or_update_location(location)?;
-
-        // Update the active locations list
-        let mut active_locations = self.active_locations.lock().unwrap();
-
-        if !location.done {
-            let index = active_locations.iter().position(|l| l.id == location.id);
-            if let Some(pos) = index {
-                active_locations[pos] = location.clone();
-            } else {
-                active_locations.push(location.clone());
-            }
-        } else {
-            if let Some(pos) = active_locations.iter().position(|l| l.id == location.id) {
-                active_locations.remove(pos);
-            }
-        }
-
-        Ok(result)
-    }
-
-    pub fn delete_location(&self, id: &str, done: bool) -> Result<usize> {
-        // Get the location before deleting it (for event notifications)
-        let _location = self.get_location_by_id(id)?;
-
-        // Delete from database
-        let result = self.core_storage.delete(LocationTable::TABLE_NAME, id)?;
-
-        // If it was an active location, update the active list
-        if !done {
-            let mut active_locations = self.active_locations.lock().unwrap();
-            if let Some(pos) = active_locations.iter().position(|l| l.id == id) {
-                active_locations.remove(pos);
-            }
-        }
 
         Ok(result)
     }

@@ -103,7 +103,6 @@ impl CoreLocalStorage {
         Ok(results)
     }
     
-    // Helper method to extract value from a row
     fn get_value_from_row(&self, row: &rusqlite::Row, index: usize) -> Result<serde_json::Value> {
         let column_type = row.get_ref(index)?.data_type();
         
@@ -214,7 +213,7 @@ impl CoreLocalStorage {
             
             if !existing.is_empty() {
                 self.update(table_name, data)?;
-                Ok(0) // Just return 0 since we're updating
+                Ok(0) 
             } else {
                 self.insert(table_name, data)
             }
@@ -235,12 +234,12 @@ impl CoreLocalStorage {
         self.connection.execute(&query, params![value])
     }
     
+    #[allow(dead_code)]
     pub fn close(self) -> Result<()> {
         self.connection.close().map_err(|(_, err)| err)
     }
 }
 
-// Helper function to convert serde_json value to ToSql param
 fn json_to_param(value: &serde_json::Value) -> Box<dyn rusqlite::ToSql> {
     match value {
         serde_json::Value::Null => Box::new(Option::<String>::None),

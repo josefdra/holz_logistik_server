@@ -1,10 +1,9 @@
 use crate::local_storage::core_local_storage::CoreLocalStorage;
 use crate::local_storage::sawmill::sawmill_tables::SawmillTable;
-use rusqlite::Result;
+use chrono::{Utc, DateTime};
+use rusqlite::{Result, params};
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
-use chrono::Utc;
+use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,7 +21,7 @@ impl Sawmill {
             name,
         }
     }
-    
+
     pub fn to_json(&self) -> serde_json::Value {
         serde_json::json!({
             "id": self.id,
@@ -30,83 +29,79 @@ impl Sawmill {
             "name": self.name,
         })
     }
-    
+
     pub fn from_json(json: &serde_json::Value) -> Result<Self, serde_json::Error> {
         Ok(Sawmill {
-            id: json.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-            last_edit: json.get("lastEdit").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-            name: json.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            id: json
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            last_edit: json
+                .get("lastEdit")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            name: json
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
         })
     }
 }
 
 pub struct SawmillLocalStorage {
     core_storage: Arc<CoreLocalStorage>,
-    sawmills: Arc<Mutex<HashMap<String, Sawmill>>>,
 }
 
 impl SawmillLocalStorage {
     pub fn new(core_storage: Arc<CoreLocalStorage>) -> Result<Self> {
         let storage = SawmillLocalStorage {
             core_storage: core_storage.clone(),
-            sawmills: Arc::new(Mutex::new(HashMap::new())),
         };
-        
-        // Initialize sawmills
-        storage.init()?;
-        
+
         Ok(storage)
     }
-    
-    fn init(&self) -> Result<()> {
-        let sawmills_json = self.core_storage.get_all(SawmillTable::TABLE_NAME)?;
-        
-        let mut sawmills = HashMap::new();
-        for sawmill_json in sawmills_json {
-            match Sawmill::from_json(&sawmill_json) {
-                Ok(sawmill) => {
-                    sawmills.insert(sawmill.id.clone(), sawmill);
-                },
-                Err(e) => eprintln!("Error parsing sawmill: {}", e),
+
+    pub fn get_sawmill_updates_by_date(&self, last_edit: DateTime<Utc>) -> Result<Vec<Sawmill>> {
+        let query = format!(
+            "SELECT * FROM {} WHERE lastEdit >= ?",
+            SawmillTable::TABLE_NAME
+        );
+
+        let conn = self.core_storage.get_connection();
+        let mut stmt = conn.prepare(&query)?;
+
+        let rows = stmt.query_map(params![last_edit.to_rfc3339()], |row| {
+            let id: String = row.get(0)?;
+            let last_edit: String = row.get(1)?;
+            let name: String = row.get(2)?;
+
+            Ok(Sawmill {
+                id,
+                last_edit,
+                name,
+            })
+        })?;
+
+        let mut sawmills = Vec::new();
+        for row in rows {
+            match row {
+                Ok(sawmill) => sawmills.push(sawmill),
+                Err(e) => eprintln!("Error fetching sawmill: {}", e),
             }
         }
-        
-        let mut sawmills_lock = self.sawmills.lock().unwrap();
-        *sawmills_lock = sawmills;
-        
-        Ok(())
+
+        Ok(sawmills)
     }
-    
+
     pub fn save_sawmill(&self, sawmill: &Sawmill) -> Result<i64> {
         let json_data = sawmill.to_json();
-        let result = self.core_storage.insert_or_update(
-            SawmillTable::TABLE_NAME,
-            &json_data
-        )?;
-        
-        // Update the sawmills map
-        let mut sawmills = self.sawmills.lock().unwrap();
-        sawmills.insert(sawmill.id.clone(), sawmill.clone());
-        
+        let result = self
+            .core_storage
+            .insert_or_update(SawmillTable::TABLE_NAME, &json_data)?;
+
         Ok(result)
-    }
-    
-    pub fn delete_sawmill(&self, id: &str) -> Result<usize> {
-        // Delete from database
-        let result = self.core_storage.delete(
-            SawmillTable::TABLE_NAME,
-            id
-        )?;
-        
-        // Update the sawmills map
-        let mut sawmills = self.sawmills.lock().unwrap();
-        sawmills.remove(id);
-        
-        Ok(result)
-    }
-    
-    pub fn get_sawmills(&self) -> HashMap<String, Sawmill> {
-        let sawmills = self.sawmills.lock().unwrap();
-        sawmills.clone()
     }
 }

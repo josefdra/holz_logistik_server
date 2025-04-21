@@ -84,29 +84,10 @@ impl ShipmentLocalStorage {
         Ok(storage)
     }
     
-    pub fn get_shipments_by_location(&self, location_id: &str) -> Result<Vec<Shipment>> {
-        let json_values = self.core_storage.get_by_column(
-            ShipmentTable::TABLE_NAME,
-            ShipmentTable::COLUMN_LOCATION_ID,
-            location_id
-        )?;
-        
-        let mut shipments = Vec::new();
-        for json_value in json_values {
-            match Shipment::from_json(&json_value) {
-                Ok(shipment) => shipments.push(shipment),
-                Err(e) => eprintln!("Error parsing shipment: {}", e),
-            }
-        }
-        
-        Ok(shipments)
-    }
-    
-    pub fn get_shipments_by_date(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> Result<Vec<Shipment>> {
+    pub fn get_shipments_by_date(&self, last_edit: DateTime<Utc>) -> Result<Vec<Shipment>> {
         let query = format!(
-            "SELECT * FROM {} WHERE {} >= ? AND {} <= ?",
+            "SELECT * FROM {} WHERE {} >= ?",
             ShipmentTable::TABLE_NAME,
-            ShipmentTable::COLUMN_LAST_EDIT,
             ShipmentTable::COLUMN_LAST_EDIT
         );
         
@@ -115,8 +96,7 @@ impl ShipmentLocalStorage {
         
         let rows = stmt.query_map(
             params![
-                start.to_rfc3339(),
-                end.to_rfc3339()
+                last_edit.to_rfc3339(),
             ],
             |row| {
                 let id: String = row.get(0)?;
@@ -154,36 +134,13 @@ impl ShipmentLocalStorage {
         Ok(shipments)
     }
     
-    pub fn get_shipment_by_id(&self, id: &str) -> Result<Shipment> {
-        let json_values = self.core_storage.get_by_id(
-            ShipmentTable::TABLE_NAME,
-            id
-        )?;
-        
-        if json_values.is_empty() {
-            return Err(rusqlite::Error::QueryReturnedNoRows);
-        }
-        
-        match Shipment::from_json(&json_values[0]) {
-            Ok(shipment) => Ok(shipment),
-            Err(e) => Err(rusqlite::Error::InvalidParameterName(
-                format!("Error parsing shipment: {}", e)
-            )),
-        }
-    }
-    
     pub fn save_shipment(&self, shipment: &Shipment) -> Result<i64> {
         let json_data = shipment.to_json();
-        self.core_storage.insert_or_update(
+        let result = self.core_storage.insert_or_update(
             ShipmentTable::TABLE_NAME,
             &json_data
-        )
-    }
-    
-    pub fn delete_shipment(&self, id: &str, _location_id: &str) -> Result<usize> {
-        self.core_storage.delete(
-            ShipmentTable::TABLE_NAME,
-            id
-        )
+        )?;
+
+        Ok(result)
     }
 }
