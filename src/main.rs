@@ -193,7 +193,6 @@ async fn handle_authentication_request(
         }
     };
 
-    // Update client first, so we can use the db_path later
     {
         match clients.lock() {
             Ok(mut clients_lock) => {
@@ -212,7 +211,6 @@ async fn handle_authentication_request(
         }
     }
 
-    // Now get the DB path after updating the client
     let db_path = match get_client_db_path(&client_id, clients) {
         Some(path) => path,
         None => {
@@ -221,7 +219,6 @@ async fn handle_authentication_request(
         }
     };
 
-    // Create a CoreLocalStorage instance
     let core_storage = match CoreLocalStorage::new(&db_path) {
         Ok(storage) => Arc::new(storage),
         Err(e) => {
@@ -230,9 +227,7 @@ async fn handle_authentication_request(
         }
     };
 
-    // Get the user by ID
     let user_result = {
-        // Create a UserLocalStorage instance
         let user_storage = match UserLocalStorage::new(core_storage) {
             Ok(storage) => storage,
             Err(e) => {
@@ -313,7 +308,6 @@ async fn handle_client_message(msg_type: &str, data: &Value, client_id: &str, cl
         msg_type, db_path
     );
 
-    // Create CoreLocalStorage instance
     let core_storage = match CoreLocalStorage::new(&db_path) {
         Ok(storage) => Arc::new(storage),
         Err(e) => {
@@ -487,7 +481,8 @@ async fn send_user_data(
 
             if let Some(newest_user) = users.last() {
                 if let Some(last_edit_str) = newest_user["lastEdit"].as_str() {
-                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str) {
+                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str)
+                    {
                         date = last_edit_date.with_timezone(&chrono::Utc);
                         date = date + chrono::Duration::milliseconds(1);
                     }
@@ -547,7 +542,8 @@ async fn send_sawmill_data(
 
             if let Some(newest_sawmill) = sawmills.last() {
                 if let Some(last_edit_str) = newest_sawmill["lastEdit"].as_str() {
-                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str) {
+                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str)
+                    {
                         date = last_edit_date.with_timezone(&chrono::Utc);
                         date = date + chrono::Duration::milliseconds(1);
                     }
@@ -607,7 +603,8 @@ async fn send_contract_data(
 
             if let Some(newest_contract) = contracts.last() {
                 if let Some(last_edit_str) = newest_contract["lastEdit"].as_str() {
-                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str) {
+                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str)
+                    {
                         date = last_edit_date.with_timezone(&chrono::Utc);
                         date = date + chrono::Duration::milliseconds(1);
                     }
@@ -669,7 +666,8 @@ async fn send_photo_data(
 
             if let Some(newest_photo) = photos.last() {
                 if let Some(last_edit_str) = newest_photo["lastEdit"].as_str() {
-                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str) {
+                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str)
+                    {
                         date = last_edit_date.with_timezone(&chrono::Utc);
                         date = date + chrono::Duration::milliseconds(1);
                     }
@@ -729,7 +727,8 @@ async fn send_note_data(
 
             if let Some(newest_note) = notes.last() {
                 if let Some(last_edit_str) = newest_note["lastEdit"].as_str() {
-                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str) {
+                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str)
+                    {
                         date = last_edit_date.with_timezone(&chrono::Utc);
                         date = date + chrono::Duration::milliseconds(1);
                     }
@@ -789,7 +788,8 @@ async fn send_location_data(
 
             if let Some(newest_location) = locations.last() {
                 if let Some(last_edit_str) = newest_location["lastEdit"].as_str() {
-                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str) {
+                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str)
+                    {
                         date = last_edit_date.with_timezone(&chrono::Utc);
                         date = date + chrono::Duration::milliseconds(1);
                     }
@@ -849,7 +849,8 @@ async fn send_shipment_data(
 
             if let Some(newest_shipment) = shipments.last() {
                 if let Some(last_edit_str) = newest_shipment["lastEdit"].as_str() {
-                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str) {
+                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str)
+                    {
                         date = last_edit_date.with_timezone(&chrono::Utc);
                         date = date + chrono::Duration::milliseconds(1);
                     }
@@ -878,108 +879,114 @@ async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients)
         }
     };
 
-    let last_contract_sync = data
-        .get("contract_date")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    let last_location_sync = data
-        .get("location_date")
+    let last_user_sync = data
+        .get("user_update")
         .and_then(|v| v.as_str())
         .unwrap_or("");
     let last_sawmill_sync = data
-        .get("sawmill_date")
+        .get("sawmill_update")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let last_note_sync = data.get("note_date").and_then(|v| v.as_str()).unwrap_or("");
-    let last_photo_sync = data
-        .get("photo_date")
+    let last_contract_sync = data
+        .get("contract_update")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let last_note_sync = data
+        .get("note_update")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let last_location_sync = data
+        .get("location_update")
         .and_then(|v| v.as_str())
         .unwrap_or("");
     let last_shipment_sync = data
-        .get("shipment_date")
+        .get("shipment_update")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let last_user_sync = data.get("user_date").and_then(|v| v.as_str()).unwrap_or("");
+    let last_photo_sync = data
+        .get("photo_update")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
 
-    let sync_tasks = tokio::join!(
-        send_user_data(
-            last_user_sync,
-            client_id.clone(),
-            core_storage.clone(),
-            clients
-        ),
-        send_sawmill_data(
-            last_sawmill_sync,
-            client_id.clone(),
-            core_storage.clone(),
-            clients
-        ),
-        send_contract_data(
-            last_contract_sync,
-            client_id.clone(),
-            core_storage.clone(),
-            clients
-        ),
-        send_note_data(
-            last_note_sync,
-            client_id.clone(),
-            core_storage.clone(),
-            clients
-        ),
-        send_location_data(
-            last_location_sync,
-            client_id.clone(),
-            core_storage.clone(),
-            clients
-        ),
-        send_shipment_data(
-            last_shipment_sync,
-            client_id.clone(),
-            core_storage.clone(),
-            clients
-        ),
-        send_photo_data(
-            last_photo_sync,
-            client_id.clone(),
-            core_storage.clone(),
-            clients
-        )
-    );
-
-    let (
-        user_result,
-        sawmill_result,
-        contract_result,
-        note_result,
-        location_result,
-        shipment_result,
-        photo_result,
-    ) = sync_tasks;
-
+    let user_result = send_user_data(
+        last_user_sync,
+        client_id.clone(),
+        core_storage.clone(),
+        clients,
+    )
+    .await;
     println!(
         "User data sync: {}",
         if user_result { "Success" } else { "Failed" }
     );
+
+    let sawmill_result = send_sawmill_data(
+        last_sawmill_sync,
+        client_id.clone(),
+        core_storage.clone(),
+        clients,
+    )
+    .await;
     println!(
         "Sawmill data sync: {}",
         if sawmill_result { "Success" } else { "Failed" }
     );
+
+    let contract_result = send_contract_data(
+        last_contract_sync,
+        client_id.clone(),
+        core_storage.clone(),
+        clients,
+    )
+    .await;
     println!(
         "Contract data sync: {}",
         if contract_result { "Success" } else { "Failed" }
     );
-    println!(
-        "Note data sync: {}",
-        if note_result { "Success" } else { "Failed" }
-    );
+
+    let location_result = send_location_data(
+        last_location_sync,
+        client_id.clone(),
+        core_storage.clone(),
+        clients,
+    )
+    .await;
     println!(
         "Location data sync: {}",
         if location_result { "Success" } else { "Failed" }
     );
+
+    let shipment_result = send_shipment_data(
+        last_shipment_sync,
+        client_id.clone(),
+        core_storage.clone(),
+        clients,
+    )
+    .await;
     println!(
         "Shipment data sync: {}",
         if shipment_result { "Success" } else { "Failed" }
     );
+
+    let note_result = send_note_data(
+        last_note_sync,
+        client_id.clone(),
+        core_storage.clone(),
+        clients,
+    )
+    .await;
+    println!(
+        "Note data sync: {}",
+        if note_result { "Success" } else { "Failed" }
+    );
+
+    let photo_result = send_photo_data(
+        last_photo_sync,
+        client_id.clone(),
+        core_storage.clone(),
+        clients,
+    )
+    .await;
     println!(
         "Photo data sync: {}",
         if photo_result { "Success" } else { "Failed" }
@@ -1046,8 +1053,6 @@ async fn authenticate_client(
     while let Some(result) = ws_rx.next().await {
         match result {
             Ok(msg) => {
-                println!("Received message: {:?}", msg);
-
                 if let Some(text) = msg.to_str().ok() {
                     if let Ok(json_msg) = serde_json::from_str::<Value>(text) {
                         if json_msg.get("type").and_then(|v| v.as_str())
@@ -1076,11 +1081,11 @@ async fn handle_authenticated_client(
     mut ws_rx: futures_util::stream::SplitStream<WebSocket>,
     clients: Clients,
 ) {
+    let mut sync_complete = false;
+
     while let Some(result) = ws_rx.next().await {
         match result {
             Ok(msg) => {
-                println!("Received message from client {}: {:?}", client_id, msg);
-
                 if let Some(text) = msg.to_str().ok() {
                     if let Ok(json_msg) = serde_json::from_str::<Value>(text) {
                         let msg_type = json_msg
@@ -1088,15 +1093,21 @@ async fn handle_authenticated_client(
                             .and_then(|v| v.as_str())
                             .unwrap_or("unknown");
 
+                        println!("Received message from client {}: {}", client_id, msg_type);
+
                         let data = json_msg.get("data").cloned().unwrap_or(json!({}));
 
                         if msg_type == "ping" {
                             send_pong(client_id.clone(), &clients).await;
                         } else if msg_type == "sync_request" {
                             handle_sync_request(&data, client_id.clone(), &clients).await;
+                        } else if msg_type == "sync_complete" {
+                            sync_complete = true;
                         } else {
                             handle_client_message(msg_type, &data, &client_id, &clients).await;
-                            broadcast_message(client_id.clone(), text, &clients).await;
+                            if sync_complete {
+                                broadcast_message(client_id.clone(), text, &clients).await;
+                            }
                         }
                     }
                 }
