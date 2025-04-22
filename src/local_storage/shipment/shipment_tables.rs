@@ -33,6 +33,9 @@ impl ShipmentTable {
     /// The column name for storing the location id of the shipment.
     pub const COLUMN_LOCATION_ID: &'static str = "locationId";
 
+    /// The column name for the deleted status.
+    pub const COLUMN_DELETED: &'static str = "deleted";
+
     /// SQL statement for creating the shipments table with the defined schema.
     pub fn create_table() -> String {
         format!(
@@ -46,6 +49,7 @@ impl ShipmentTable {
                 {} TEXT NOT NULL,
                 {} TEXT NOT NULL,
                 {} TEXT NOT NULL,
+                {} INTEGER NOT NULL,
                 FOREIGN KEY ({}) REFERENCES users(id),
                 FOREIGN KEY ({}) REFERENCES contracts(id),
                 FOREIGN KEY ({}) REFERENCES sawmills(id),
@@ -61,6 +65,7 @@ impl ShipmentTable {
             Self::COLUMN_CONTRACT_ID,
             Self::COLUMN_SAWMILL_ID,
             Self::COLUMN_LOCATION_ID,
+            Self::COLUMN_DELETED,
             Self::COLUMN_USER_ID,
             Self::COLUMN_CONTRACT_ID,
             Self::COLUMN_SAWMILL_ID,

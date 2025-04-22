@@ -18,6 +18,9 @@ impl PhotoTable {
     /// The column name for storing the location id of the photo.
     pub const COLUMN_LOCATION_ID: &'static str = "locationId";
 
+    /// The column name for the deleted status.
+    pub const COLUMN_DELETED: &'static str = "deleted";
+
     /// SQL statement for creating the photos table with the defined schema.
     pub fn create_table() -> String {
         format!(
@@ -26,6 +29,7 @@ impl PhotoTable {
                 {} TEXT NOT NULL,
                 {} BLOB NOT NULL,
                 {} TEXT NOT NULL,
+                {} INTEGER NOT NULL,
                 FOREIGN KEY ({}) REFERENCES locations(id)
             )",
             Self::TABLE_NAME,
@@ -33,6 +37,7 @@ impl PhotoTable {
             Self::COLUMN_LAST_EDIT,
             Self::COLUMN_PHOTO,
             Self::COLUMN_LOCATION_ID,
+            Self::COLUMN_DELETED,
             Self::COLUMN_LOCATION_ID
         )
     }

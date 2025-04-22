@@ -1,19 +1,19 @@
 mod local_storage;
 
-use local_storage::contract::contract_local_storage::{Contract, ContractLocalStorage};
+use local_storage::contract::contract_local_storage::ContractLocalStorage;
 use local_storage::contract::contract_tables::ContractTable;
 use local_storage::core_local_storage::CoreLocalStorage;
-use local_storage::location::location_local_storage::{Location, LocationLocalStorage};
+use local_storage::location::location_local_storage::LocationLocalStorage;
 use local_storage::location::location_tables::{LocationSawmillJunctionTable, LocationTable};
-use local_storage::note::note_local_storage::{Note, NoteLocalStorage};
+use local_storage::note::note_local_storage::NoteLocalStorage;
 use local_storage::note::note_tables::NoteTable;
 use local_storage::photo::photo_local_storage::PhotoLocalStorage;
 use local_storage::photo::photo_tables::PhotoTable;
-use local_storage::sawmill::sawmill_local_storage::{Sawmill, SawmillLocalStorage};
+use local_storage::sawmill::sawmill_local_storage::SawmillLocalStorage;
 use local_storage::sawmill::sawmill_tables::SawmillTable;
-use local_storage::shipment::shipment_local_storage::{Shipment, ShipmentLocalStorage};
+use local_storage::shipment::shipment_local_storage::ShipmentLocalStorage;
 use local_storage::shipment::shipment_tables::ShipmentTable;
-use local_storage::user::user_local_storage::{User, UserLocalStorage};
+use local_storage::user::user_local_storage::UserLocalStorage;
 use local_storage::user::user_tables::UserTable;
 
 use chrono;
@@ -275,7 +275,7 @@ async fn handle_authentication_request(
         return false;
     }
 
-    let user_data = user_result.unwrap().to_json();
+    let user_data = user_result.unwrap();
 
     let response = json!({
         "type": "authentication_response",
@@ -338,15 +338,8 @@ fn handle_contract_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
     match ContractLocalStorage::new(core_storage) {
         Ok(contract_storage) => {
             println!("Contract update received: {:?}", data);
-            match Contract::from_json(data) {
-                Ok(contract) => {
-                    if let Err(e) = contract_storage.save_contract(&contract) {
-                        println!("Failed to save contract: {:?}", e);
-                    }
-                }
-                Err(e) => {
-                    println!("Failed to parse contract data: {:?}", e);
-                }
+            if let Err(e) = contract_storage.save_contract(data) {
+                println!("Failed to save contract: {:?}", e);
             }
         }
         Err(e) => {
@@ -359,15 +352,8 @@ fn handle_location_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
     match LocationLocalStorage::new(core_storage) {
         Ok(location_storage) => {
             println!("Location update received: {:?}", data);
-            match Location::from_json(data) {
-                Ok(location) => {
-                    if let Err(e) = location_storage.save_location(&location) {
-                        println!("Failed to save location: {:?}", e);
-                    }
-                }
-                Err(e) => {
-                    println!("Failed to parse location data: {:?}", e);
-                }
+            if let Err(e) = location_storage.save_location(data) {
+                println!("Failed to save location: {:?}", e);
             }
         }
         Err(e) => {
@@ -380,15 +366,8 @@ fn handle_note_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
     match NoteLocalStorage::new(core_storage) {
         Ok(note_storage) => {
             println!("Note update received: {:?}", data);
-            match Note::from_json(data) {
-                Ok(note) => {
-                    if let Err(e) = note_storage.save_note(&note) {
-                        println!("Failed to save note: {:?}", e);
-                    }
-                }
-                Err(e) => {
-                    println!("Failed to parse note data: {:?}", e);
-                }
+            if let Err(e) = note_storage.save_note(data) {
+                println!("Failed to save note: {:?}", e);
             }
         }
         Err(e) => {
@@ -415,15 +394,8 @@ fn handle_sawmill_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
     match SawmillLocalStorage::new(core_storage) {
         Ok(sawmill_storage) => {
             println!("Sawmill update received: {:?}", data);
-            match Sawmill::from_json(data) {
-                Ok(sawmill) => {
-                    if let Err(e) = sawmill_storage.save_sawmill(&sawmill) {
-                        println!("Failed to save sawmill: {:?}", e);
-                    }
-                }
-                Err(e) => {
-                    println!("Failed to parse sawmill data: {:?}", e);
-                }
+            if let Err(e) = sawmill_storage.save_sawmill(data) {
+                println!("Failed to save sawmill: {:?}", e);
             }
         }
         Err(e) => {
@@ -436,15 +408,8 @@ fn handle_shipment_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
     match ShipmentLocalStorage::new(core_storage) {
         Ok(shipment_storage) => {
             println!("Shipment update received: {:?}", data);
-            match Shipment::from_json(data) {
-                Ok(shipment) => {
-                    if let Err(e) = shipment_storage.save_shipment(&shipment) {
-                        println!("Failed to save shipment: {:?}", e);
-                    }
-                }
-                Err(e) => {
-                    println!("Failed to parse shipment data: {:?}", e);
-                }
+            if let Err(e) = shipment_storage.save_shipment(data) {
+                println!("Failed to save shipment: {:?}", e);
             }
         }
         Err(e) => {
@@ -457,19 +422,15 @@ fn handle_user_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
     match UserLocalStorage::new(core_storage) {
         Ok(user_storage) => {
             println!("User update received: {:?}", data);
-            match User::from_json(data) {
-                Ok(user) => {
-                    if user.name == "" {
-                        println!("Empty user");
-                        return;
-                    }
-                    if let Err(e) = user_storage.save_user(&user) {
-                        println!("Failed to save user: {:?}", e);
-                    }
+            if let Some(name) = data.get("name").and_then(|n| n.as_str()) {
+                if name.is_empty() {
+                    println!("Empty user");
+                    return;
                 }
-                Err(e) => {
-                    println!("Failed to parse user data: {:?}", e);
-                }
+            }
+
+            if let Err(e) = user_storage.save_user(data) {
+                println!("Failed to save user: {:?}", e);
             }
         }
         Err(e) => {
@@ -492,7 +453,7 @@ async fn send_user_data(
         }
     };
 
-    let date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
+    let mut date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
         Ok(date) => date.with_timezone(&chrono::Utc),
         Err(e) => {
             println!("Failed to parse last sync date: {:?}", e);
@@ -500,22 +461,39 @@ async fn send_user_data(
         }
     };
 
-    let users = match user_storage.get_user_updates_by_date(date) {
-        Ok(users) => users,
-        Err(e) => {
-            println!("Failed to get user updates: {:?}", e);
-            return false;
+    let mut should_continue = true;
+
+    while should_continue {
+        let users = match user_storage.get_user_updates_by_date(date) {
+            Ok(users) => users,
+            Err(e) => {
+                println!("Failed to get user updates: {:?}", e);
+                return false;
+            }
+        };
+
+        if users.is_empty() {
+            should_continue = false;
+        } else {
+            for user in &users {
+                let response = serde_json::json!({
+                    "type": "user_update",
+                    "data": user,
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                });
+
+                send_message(client_id.clone(), &response.to_string(), clients).await;
+            }
+
+            if let Some(newest_user) = users.last() {
+                if let Some(last_edit_str) = newest_user["lastEdit"].as_str() {
+                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str) {
+                        date = last_edit_date.with_timezone(&chrono::Utc);
+                        date = date + chrono::Duration::milliseconds(1);
+                    }
+                }
+            }
         }
-    };
-
-    for user in &users {
-        let response = serde_json::json!({
-            "type": "user_update",
-            "data": user.to_json(),
-            "timestamp": chrono::Utc::now().to_rfc3339()
-        });
-
-        send_message(client_id.clone(), &response.to_string(), clients).await;
     }
 
     true
@@ -535,7 +513,7 @@ async fn send_sawmill_data(
         }
     };
 
-    let date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
+    let mut date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
         Ok(date) => date.with_timezone(&chrono::Utc),
         Err(e) => {
             println!("Failed to parse last sync date: {:?}", e);
@@ -543,22 +521,39 @@ async fn send_sawmill_data(
         }
     };
 
-    let sawmills = match sawmill_storage.get_sawmill_updates_by_date(date) {
-        Ok(sawmills) => sawmills,
-        Err(e) => {
-            println!("Failed to get sawmill updates: {:?}", e);
-            return false;
+    let mut should_continue = true;
+
+    while should_continue {
+        let sawmills = match sawmill_storage.get_sawmill_updates_by_date(date) {
+            Ok(sawmills) => sawmills,
+            Err(e) => {
+                println!("Failed to get sawmill updates: {:?}", e);
+                return false;
+            }
+        };
+
+        if sawmills.is_empty() {
+            should_continue = false;
+        } else {
+            for sawmill in &sawmills {
+                let response = serde_json::json!({
+                    "type": "sawmill_update",
+                    "data": sawmill,
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                });
+
+                send_message(client_id.clone(), &response.to_string(), clients).await;
+            }
+
+            if let Some(newest_sawmill) = sawmills.last() {
+                if let Some(last_edit_str) = newest_sawmill["lastEdit"].as_str() {
+                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str) {
+                        date = last_edit_date.with_timezone(&chrono::Utc);
+                        date = date + chrono::Duration::milliseconds(1);
+                    }
+                }
+            }
         }
-    };
-
-    for sawmill in &sawmills {
-        let response = serde_json::json!({
-            "type": "sawmill_update",
-            "data": sawmill.to_json(),
-            "timestamp": chrono::Utc::now().to_rfc3339()
-        });
-
-        send_message(client_id.clone(), &response.to_string(), clients).await;
     }
 
     true
@@ -578,7 +573,7 @@ async fn send_contract_data(
         }
     };
 
-    let date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
+    let mut date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
         Ok(date) => date.with_timezone(&chrono::Utc),
         Err(e) => {
             println!("Failed to parse last sync date: {:?}", e);
@@ -586,22 +581,39 @@ async fn send_contract_data(
         }
     };
 
-    let contracts = match contract_storage.get_contract_updates_by_date(date) {
-        Ok(contracts) => contracts,
-        Err(e) => {
-            println!("Failed to get contract updates: {:?}", e);
-            return false;
+    let mut should_continue = true;
+
+    while should_continue {
+        let contracts = match contract_storage.get_contract_updates_by_date(date) {
+            Ok(contracts) => contracts,
+            Err(e) => {
+                println!("Failed to get contract updates: {:?}", e);
+                return false;
+            }
+        };
+
+        if contracts.is_empty() {
+            should_continue = false;
+        } else {
+            for contract in &contracts {
+                let response = serde_json::json!({
+                    "type": "contract_update",
+                    "data": contract,
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                });
+
+                send_message(client_id.clone(), &response.to_string(), clients).await;
+            }
+
+            if let Some(newest_contract) = contracts.last() {
+                if let Some(last_edit_str) = newest_contract["lastEdit"].as_str() {
+                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str) {
+                        date = last_edit_date.with_timezone(&chrono::Utc);
+                        date = date + chrono::Duration::milliseconds(1);
+                    }
+                }
+            }
         }
-    };
-
-    for contract in &contracts {
-        let response = serde_json::json!({
-            "type": "contract_update",
-            "data": contract.to_json(),
-            "timestamp": chrono::Utc::now().to_rfc3339()
-        });
-
-        send_message(client_id.clone(), &response.to_string(), clients).await;
     }
 
     true
@@ -621,7 +633,7 @@ async fn send_photo_data(
         }
     };
 
-    let date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
+    let mut date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
         Ok(date) => date.with_timezone(&chrono::Utc),
         Err(e) => {
             println!("Failed to parse last sync date: {:?}", e);
@@ -629,24 +641,41 @@ async fn send_photo_data(
         }
     };
 
-    let photos = match photo_storage.get_photo_updates_by_date(date) {
-        Ok(photos) => photos,
-        Err(e) => {
-            println!("Failed to get photo updates: {:?}", e);
-            return false;
+    let mut should_continue = true;
+
+    while should_continue {
+        let photos = match photo_storage.get_photo_updates_by_date(date) {
+            Ok(photos) => photos,
+            Err(e) => {
+                println!("Failed to get photo updates: {:?}", e);
+                return false;
+            }
+        };
+
+        if photos.is_empty() {
+            should_continue = false;
+        } else {
+            for photo in &photos {
+                let response = serde_json::json!({
+                    "type": "photo_update",
+                    "data": photo,
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                });
+
+                send_message(client_id.clone(), &response.to_string(), clients).await;
+
+                tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+            }
+
+            if let Some(newest_photo) = photos.last() {
+                if let Some(last_edit_str) = newest_photo["lastEdit"].as_str() {
+                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str) {
+                        date = last_edit_date.with_timezone(&chrono::Utc);
+                        date = date + chrono::Duration::milliseconds(1);
+                    }
+                }
+            }
         }
-    };
-
-    for photo in &photos {
-        let response = serde_json::json!({
-            "type": "photo_update",
-            "data": photo,
-            "timestamp": chrono::Utc::now().to_rfc3339()
-        });
-
-        send_message(client_id.clone(), &response.to_string(), clients).await;
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
     }
 
     true
@@ -666,7 +695,7 @@ async fn send_note_data(
         }
     };
 
-    let date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
+    let mut date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
         Ok(date) => date.with_timezone(&chrono::Utc),
         Err(e) => {
             println!("Failed to parse last sync date: {:?}", e);
@@ -674,22 +703,39 @@ async fn send_note_data(
         }
     };
 
-    let notes = match note_storage.get_note_updates_by_date(date) {
-        Ok(notes) => notes,
-        Err(e) => {
-            println!("Failed to get note updates: {:?}", e);
-            return false;
+    let mut should_continue = true;
+
+    while should_continue {
+        let notes = match note_storage.get_note_updates_by_date(date) {
+            Ok(notes) => notes,
+            Err(e) => {
+                println!("Failed to get note updates: {:?}", e);
+                return false;
+            }
+        };
+
+        if notes.is_empty() {
+            should_continue = false;
+        } else {
+            for note in &notes {
+                let response = serde_json::json!({
+                    "type": "note_update",
+                    "data": note,
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                });
+
+                send_message(client_id.clone(), &response.to_string(), clients).await;
+            }
+
+            if let Some(newest_note) = notes.last() {
+                if let Some(last_edit_str) = newest_note["lastEdit"].as_str() {
+                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str) {
+                        date = last_edit_date.with_timezone(&chrono::Utc);
+                        date = date + chrono::Duration::milliseconds(1);
+                    }
+                }
+            }
         }
-    };
-
-    for note in &notes {
-        let response = serde_json::json!({
-            "type": "note_update",
-            "data": note.to_json(),
-            "timestamp": chrono::Utc::now().to_rfc3339()
-        });
-
-        send_message(client_id.clone(), &response.to_string(), clients).await;
     }
 
     true
@@ -709,7 +755,7 @@ async fn send_location_data(
         }
     };
 
-    let date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
+    let mut date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
         Ok(date) => date.with_timezone(&chrono::Utc),
         Err(e) => {
             println!("Failed to parse last sync date: {:?}", e);
@@ -717,22 +763,39 @@ async fn send_location_data(
         }
     };
 
-    let locations = match location_storage.get_location_updates_by_date(date) {
-        Ok(locations) => locations,
-        Err(e) => {
-            println!("Failed to get location updates: {:?}", e);
-            return false;
+    let mut should_continue = true;
+
+    while should_continue {
+        let locations = match location_storage.get_location_updates_by_date(date) {
+            Ok(locations) => locations,
+            Err(e) => {
+                println!("Failed to get location updates: {:?}", e);
+                return false;
+            }
+        };
+
+        if locations.is_empty() {
+            should_continue = false;
+        } else {
+            for location in &locations {
+                let response = serde_json::json!({
+                    "type": "location_update",
+                    "data": location,
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                });
+
+                send_message(client_id.clone(), &response.to_string(), clients).await;
+            }
+
+            if let Some(newest_location) = locations.last() {
+                if let Some(last_edit_str) = newest_location["lastEdit"].as_str() {
+                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str) {
+                        date = last_edit_date.with_timezone(&chrono::Utc);
+                        date = date + chrono::Duration::milliseconds(1);
+                    }
+                }
+            }
         }
-    };
-
-    for location in &locations {
-        let response = serde_json::json!({
-            "type": "location_update",
-            "data": location.to_json(),
-            "timestamp": chrono::Utc::now().to_rfc3339()
-        });
-
-        send_message(client_id.clone(), &response.to_string(), clients).await;
     }
 
     true
@@ -752,7 +815,7 @@ async fn send_shipment_data(
         }
     };
 
-    let date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
+    let mut date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
         Ok(date) => date.with_timezone(&chrono::Utc),
         Err(e) => {
             println!("Failed to parse last sync date: {:?}", e);
@@ -760,22 +823,39 @@ async fn send_shipment_data(
         }
     };
 
-    let shipments = match shipment_storage.get_shipments_by_date(date) {
-        Ok(shipments) => shipments,
-        Err(e) => {
-            println!("Failed to get shipment updates: {:?}", e);
-            return false;
+    let mut should_continue = true;
+
+    while should_continue {
+        let shipments = match shipment_storage.get_shipments_by_date(date) {
+            Ok(shipments) => shipments,
+            Err(e) => {
+                println!("Failed to get shipment updates: {:?}", e);
+                return false;
+            }
+        };
+
+        if shipments.is_empty() {
+            should_continue = false;
+        } else {
+            for shipment in &shipments {
+                let response = serde_json::json!({
+                    "type": "shipment_update",
+                    "data": shipment,
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                });
+
+                send_message(client_id.clone(), &response.to_string(), clients).await;
+            }
+
+            if let Some(newest_shipment) = shipments.last() {
+                if let Some(last_edit_str) = newest_shipment["lastEdit"].as_str() {
+                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str) {
+                        date = last_edit_date.with_timezone(&chrono::Utc);
+                        date = date + chrono::Duration::milliseconds(1);
+                    }
+                }
+            }
         }
-    };
-
-    for shipment in &shipments {
-        let response = serde_json::json!({
-            "type": "shipment_update",
-            "data": shipment.to_json(),
-            "timestamp": chrono::Utc::now().to_rfc3339()
-        });
-
-        send_message(client_id.clone(), &response.to_string(), clients).await;
     }
 
     true
@@ -786,7 +866,7 @@ async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients)
         Some(path) => path,
         None => {
             println!("No database associated with client {}", client_id);
-            return true;
+            return false;
         }
     };
 
@@ -794,7 +874,7 @@ async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients)
         Ok(storage) => Arc::new(storage),
         Err(e) => {
             println!("Failed to create core storage: {:?}", e);
-            return true;
+            return false;
         }
     };
 
@@ -821,139 +901,98 @@ async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients)
         .unwrap_or("");
     let last_user_sync = data.get("user_date").and_then(|v| v.as_str()).unwrap_or("");
 
-    let mut all_syncs_completed = true;
+    let sync_tasks = tokio::join!(
+        send_user_data(
+            last_user_sync,
+            client_id.clone(),
+            core_storage.clone(),
+            clients
+        ),
+        send_sawmill_data(
+            last_sawmill_sync,
+            client_id.clone(),
+            core_storage.clone(),
+            clients
+        ),
+        send_contract_data(
+            last_contract_sync,
+            client_id.clone(),
+            core_storage.clone(),
+            clients
+        ),
+        send_note_data(
+            last_note_sync,
+            client_id.clone(),
+            core_storage.clone(),
+            clients
+        ),
+        send_location_data(
+            last_location_sync,
+            client_id.clone(),
+            core_storage.clone(),
+            clients
+        ),
+        send_shipment_data(
+            last_shipment_sync,
+            client_id.clone(),
+            core_storage.clone(),
+            clients
+        ),
+        send_photo_data(
+            last_photo_sync,
+            client_id.clone(),
+            core_storage.clone(),
+            clients
+        )
+    );
 
-    // User data sync
-    let user_sync_result = send_user_data(
-        last_user_sync,
-        client_id.clone(),
-        core_storage.clone(),
-        clients,
-    )
-    .await;
+    let (
+        user_result,
+        sawmill_result,
+        contract_result,
+        note_result,
+        location_result,
+        shipment_result,
+        photo_result,
+    ) = sync_tasks;
+
     println!(
         "User data sync: {}",
-        if user_sync_result {
-            "Success"
-        } else {
-            "Failed"
-        }
+        if user_result { "Success" } else { "Failed" }
     );
-    all_syncs_completed &= user_sync_result;
-
-    // Sawmill data sync
-    let sawmill_sync_result = send_sawmill_data(
-        last_sawmill_sync,
-        client_id.clone(),
-        core_storage.clone(),
-        clients,
-    )
-    .await;
     println!(
         "Sawmill data sync: {}",
-        if sawmill_sync_result {
-            "Success"
-        } else {
-            "Failed"
-        }
+        if sawmill_result { "Success" } else { "Failed" }
     );
-    all_syncs_completed &= sawmill_sync_result;
-
-    // Contract data sync
-    let contract_sync_result = send_contract_data(
-        last_contract_sync,
-        client_id.clone(),
-        core_storage.clone(),
-        clients,
-    )
-    .await;
     println!(
         "Contract data sync: {}",
-        if contract_sync_result {
-            "Success"
-        } else {
-            "Failed"
-        }
+        if contract_result { "Success" } else { "Failed" }
     );
-    all_syncs_completed &= contract_sync_result;
-
-    // Photo data sync
-    let photo_sync_result = send_photo_data(
-        last_photo_sync,
-        client_id.clone(),
-        core_storage.clone(),
-        clients,
-    )
-    .await;
-    println!(
-        "Photo data sync: {}",
-        if photo_sync_result {
-            "Success"
-        } else {
-            "Failed"
-        }
-    );
-    all_syncs_completed &= photo_sync_result;
-
-    // Note data sync
-    let note_sync_result = send_note_data(
-        last_note_sync,
-        client_id.clone(),
-        core_storage.clone(),
-        clients,
-    )
-    .await;
     println!(
         "Note data sync: {}",
-        if note_sync_result {
-            "Success"
-        } else {
-            "Failed"
-        }
+        if note_result { "Success" } else { "Failed" }
     );
-    all_syncs_completed &= note_sync_result;
-
-    // Location data sync
-    let location_sync_result = send_location_data(
-        last_location_sync,
-        client_id.clone(),
-        core_storage.clone(),
-        clients,
-    )
-    .await;
     println!(
         "Location data sync: {}",
-        if location_sync_result {
-            "Success"
-        } else {
-            "Failed"
-        }
+        if location_result { "Success" } else { "Failed" }
     );
-    all_syncs_completed &= location_sync_result;
-
-    // Shipment data sync
-    let shipment_sync_result = send_shipment_data(
-        last_shipment_sync,
-        client_id.clone(),
-        core_storage.clone(),
-        clients,
-    )
-    .await;
     println!(
         "Shipment data sync: {}",
-        if shipment_sync_result {
-            "Success"
-        } else {
-            "Failed"
-        }
+        if shipment_result { "Success" } else { "Failed" }
     );
-    all_syncs_completed &= shipment_sync_result;
-
     println!(
-        "All syncs completed: {}",
-        if all_syncs_completed { "Yes" } else { "No" }
+        "Photo data sync: {}",
+        if photo_result { "Success" } else { "Failed" }
     );
-    all_syncs_completed
+
+    let completion_message = serde_json::json!({
+        "type": "sync_complete",
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    });
+
+    send_message(client_id.clone(), &completion_message.to_string(), clients).await;
+
+    true
 }
 
 async fn send_message(client_id: String, msg: &str, clients: &Clients) {
@@ -1054,11 +1093,7 @@ async fn handle_authenticated_client(
                         if msg_type == "ping" {
                             send_pong(client_id.clone(), &clients).await;
                         } else if msg_type == "sync_request" {
-                            let mut sync_completed = false;
-                            while !sync_completed {
-                                sync_completed =
-                                    handle_sync_request(&data, client_id.clone(), &clients).await;
-                            }
+                            handle_sync_request(&data, client_id.clone(), &clients).await;
                         } else {
                             handle_client_message(msg_type, &data, &client_id, &clients).await;
                             broadcast_message(client_id.clone(), text, &clients).await;

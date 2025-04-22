@@ -2,82 +2,8 @@ use crate::local_storage::core_local_storage::CoreLocalStorage;
 use crate::local_storage::shipment::shipment_tables::ShipmentTable;
 use chrono::{DateTime, Utc};
 use rusqlite::{Result, params};
-use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::sync::Arc;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Shipment {
-    pub id: String,
-    pub last_edit: String,
-    pub quantity: f64,
-    pub oversize_quantity: f64,
-    pub piece_count: i32,
-    pub user_id: String,
-    pub contract_id: String,
-    pub sawmill_id: String,
-    pub location_id: String,
-}
-
-impl Shipment {
-    pub fn to_json(&self) -> serde_json::Value {
-        serde_json::json!({
-            "id": self.id,
-            "lastEdit": self.last_edit,
-            "quantity": self.quantity,
-            "oversizeQuantity": self.oversize_quantity,
-            "pieceCount": self.piece_count,
-            "userId": self.user_id,
-            "contractId": self.contract_id,
-            "sawmillId": self.sawmill_id,
-            "locationId": self.location_id,
-        })
-    }
-
-    pub fn from_json(json: &serde_json::Value) -> Result<Self, serde_json::Error> {
-        Ok(Shipment {
-            id: json
-                .get("id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-            last_edit: json
-                .get("lastEdit")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-            quantity: json.get("quantity").and_then(|v| v.as_f64()).unwrap_or(0.0),
-            oversize_quantity: json
-                .get("oversizeQuantity")
-                .and_then(|v| v.as_f64())
-                .unwrap_or(0.0),
-            piece_count: json
-                .get("pieceCount")
-                .and_then(|v| v.as_i64())
-                .map(|v| v as i32)
-                .unwrap_or(0),
-            user_id: json
-                .get("userId")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-            contract_id: json
-                .get("contractId")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-            sawmill_id: json
-                .get("sawmillId")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-            location_id: json
-                .get("locationId")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-        })
-    }
-}
 
 pub struct ShipmentLocalStorage {
     core_storage: Arc<CoreLocalStorage>,
@@ -92,17 +18,16 @@ impl ShipmentLocalStorage {
         Ok(storage)
     }
 
-    pub fn get_shipments_by_date(&self, last_edit: DateTime<Utc>) -> Result<Vec<Shipment>> {
+    pub fn get_shipments_by_date(&self, last_edit: DateTime<Utc>) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT * FROM {} WHERE {} >= ?",
-            ShipmentTable::TABLE_NAME,
-            ShipmentTable::COLUMN_LAST_EDIT
+            "SELECT * FROM {} WHERE deleted = 0 AND lastEdit >= ? ORDER BY lastEdit ASC",
+            ShipmentTable::TABLE_NAME
         );
 
         let conn = self.core_storage.get_connection()?;
         let mut stmt = conn.prepare(&query)?;
 
-        let rows = stmt.query_map(params![last_edit.to_rfc3339(),], |row| {
+        let rows = stmt.query_map(params![last_edit.to_rfc3339()], |row| {
             let id: String = row.get(0)?;
             let last_edit: String = row.get(1)?;
             let quantity: f64 = row.get(2)?;
@@ -113,17 +38,19 @@ impl ShipmentLocalStorage {
             let sawmill_id: String = row.get(7)?;
             let location_id: String = row.get(8)?;
 
-            Ok(Shipment {
-                id,
-                last_edit,
-                quantity,
-                oversize_quantity,
-                piece_count,
-                user_id,
-                contract_id,
-                sawmill_id,
-                location_id,
-            })
+            let shipment_json = serde_json::json!({
+                "id": id,
+                "lastEdit": last_edit,
+                "quantity": quantity,
+                "oversizeQuantity": oversize_quantity,
+                "pieceCount": piece_count,
+                "userId": user_id,
+                "contractId": contract_id,
+                "sawmillId": sawmill_id,
+                "locationId": location_id,
+            });
+
+            Ok(shipment_json)
         })?;
 
         let mut shipments = Vec::new();
@@ -137,11 +64,10 @@ impl ShipmentLocalStorage {
         Ok(shipments)
     }
 
-    pub fn save_shipment(&self, shipment: &Shipment) -> Result<i64> {
-        let json_data = shipment.to_json();
+    pub fn save_shipment(&self, shipment_data: &Value) -> Result<i64> {
         let result = self
             .core_storage
-            .insert_or_update(ShipmentTable::TABLE_NAME, &json_data)?;
+            .insert_or_update(ShipmentTable::TABLE_NAME, shipment_data)?;
 
         Ok(result)
     }

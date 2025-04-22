@@ -36,6 +36,9 @@ impl ContractTable {
     /// The column name for storing the shipped quantity of the contract.
     pub const COLUMN_SHIPPED_QUANTITY: &'static str = "shippedQuantity";
 
+    /// The column name for the deleted status.
+    pub const COLUMN_DELETED: &'static str = "deleted";
+
     /// SQL statement for creating the contracts table with the defined schema.
     pub fn create_table() -> String {
         format!(
@@ -49,7 +52,8 @@ impl ContractTable {
                 {} TEXT NOT NULL,
                 {} REAL NOT NULL,
                 {} REAL NOT NULL,
-                {} REAL NOT NULL
+                {} REAL NOT NULL,
+                {} INTEGER NOT NULL
             )",
             Self::TABLE_NAME,
             Self::COLUMN_ID,
@@ -61,7 +65,8 @@ impl ContractTable {
             Self::COLUMN_END_DATE,
             Self::COLUMN_AVAILABLE_QUANTITY,
             Self::COLUMN_BOOKED_QUANTITY,
-            Self::COLUMN_SHIPPED_QUANTITY
+            Self::COLUMN_SHIPPED_QUANTITY,
+            Self::COLUMN_DELETED
         )
     }
 }

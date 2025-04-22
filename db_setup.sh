@@ -18,13 +18,17 @@ DB_PATH="databases/${TENANT}.db"
 # Create database schema
 cat > create_table.sql << EOL
 PRAGMA foreign_keys = ON;
+PRAGMA journal_mode = WAL;
+PRAGMA synchronous = NORMAL;
+PRAGMA busy_timeout = 10000;
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY NOT NULL,
     lastEdit TEXT NOT NULL,
     role INTEGER NOT NULL,
-    name TEXT NOT NULL
+    name TEXT NOT NULL,
+    deleted INTEGER DEFAULT 0
 );
 
 -- Contracts table
@@ -38,14 +42,16 @@ CREATE TABLE IF NOT EXISTS contracts (
     endDate TEXT NOT NULL,
     availableQuantity REAL NOT NULL,
     bookedQuantity REAL NOT NULL,
-    shippedQuantity REAL NOT NULL
+    shippedQuantity REAL NOT NULL,
+    deleted INTEGER DEFAULT 0
 );
 
 -- Sawmills table
 CREATE TABLE IF NOT EXISTS sawmills (
     id TEXT PRIMARY KEY NOT NULL,
     lastEdit TEXT NOT NULL,
-    name TEXT NOT NULL
+    name TEXT NOT NULL,
+    deleted INTEGER DEFAULT 0
 );
 
 -- Locations table
@@ -66,7 +72,7 @@ CREATE TABLE IF NOT EXISTS locations (
     currentOversizeQuantity REAL NOT NULL,
     currentPieceCount INTEGER NOT NULL,
     contractId TEXT NOT NULL,
-    FOREIGN KEY (contractId) REFERENCES contracts(id)
+    deleted INTEGER DEFAULT 0
 );
 
 -- Location-Sawmill Junction table
@@ -85,7 +91,7 @@ CREATE TABLE IF NOT EXISTS notes (
     lastEdit TEXT NOT NULL,
     text TEXT NOT NULL,
     userId TEXT NOT NULL,
-    FOREIGN KEY (userId) REFERENCES users(id)
+    deleted INTEGER DEFAULT 0
 );
 
 -- Photos table
@@ -94,7 +100,7 @@ CREATE TABLE IF NOT EXISTS photos (
     lastEdit TEXT NOT NULL,
     photoFile BLOB NOT NULL,
     locationId TEXT NOT NULL,
-    FOREIGN KEY (locationId) REFERENCES locations(id)
+    deleted INTEGER DEFAULT 0
 );
 
 -- Shipments table
@@ -108,10 +114,7 @@ CREATE TABLE IF NOT EXISTS shipments (
     contractId TEXT NOT NULL,
     sawmillId TEXT NOT NULL,
     locationId TEXT NOT NULL,
-    FOREIGN KEY (userId) REFERENCES users(id),
-    FOREIGN KEY (contractId) REFERENCES contracts(id),
-    FOREIGN KEY (sawmillId) REFERENCES sawmills(id),
-    FOREIGN KEY (locationId) REFERENCES locations(id)
+    deleted INTEGER DEFAULT 0
 );
 EOL
 

@@ -54,6 +54,9 @@ impl LocationTable {
     /// The column name for storing the contract id of the location.
     pub const COLUMN_CONTRACT_ID: &'static str = "contractId";
 
+    /// The column name for the deleted status.
+    pub const COLUMN_DELETED: &'static str = "deleted";
+
     /// SQL statement for creating the locations table with the defined schema.
     pub fn create_table() -> String {
         format!(
@@ -74,6 +77,7 @@ impl LocationTable {
                 {} REAL NOT NULL,
                 {} INTEGER NOT NULL,
                 {} TEXT NOT NULL,
+                {} INTEGER NOT NULL,
                 FOREIGN KEY ({}) REFERENCES contracts(id)
             )",
             Self::TABLE_NAME,
@@ -93,6 +97,7 @@ impl LocationTable {
             Self::COLUMN_CURRENT_OVERSIZE_QUANTITY,
             Self::COLUMN_CURRENT_PIECE_COUNT,
             Self::COLUMN_CONTRACT_ID,
+            Self::COLUMN_DELETED,
             Self::COLUMN_CONTRACT_ID
         )
     }

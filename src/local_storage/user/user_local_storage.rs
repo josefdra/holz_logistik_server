@@ -2,52 +2,8 @@ use crate::local_storage::core_local_storage::CoreLocalStorage;
 use crate::local_storage::user::user_tables::UserTable;
 use chrono::{DateTime, Utc};
 use rusqlite::{Result, params};
-use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::sync::Arc;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct User {
-    pub id: String,
-    pub last_edit: String,
-    pub role: i32,
-    pub name: String,
-}
-
-impl User {
-    pub fn to_json(&self) -> serde_json::Value {
-        serde_json::json!({
-            "id": self.id,
-            "lastEdit": self.last_edit,
-            "role": self.role,
-            "name": self.name,
-        })
-    }
-
-    pub fn from_json(json: &serde_json::Value) -> Result<Self, serde_json::Error> {
-        Ok(User {
-            id: json
-                .get("id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-            last_edit: json
-                .get("lastEdit")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-            role: json
-                .get("role")
-                .and_then(|v| v.as_i64())
-                .map(|v| v as i32)
-                .unwrap_or(0),
-            name: json
-                .get("name")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-        })
-    }
-}
 
 pub struct UserLocalStorage {
     core_storage: Arc<CoreLocalStorage>,
@@ -62,25 +18,19 @@ impl UserLocalStorage {
         Ok(storage)
     }
 
-    pub fn get_user_by_id(&self, id: &str) -> Result<Option<User>> {
+    pub fn get_user_by_id(&self, id: &str) -> Result<Option<Value>> {
         let user_json = self.core_storage.get_by_id(UserTable::TABLE_NAME, id)?;
 
         if user_json.is_empty() {
             return Ok(None);
         }
 
-        match User::from_json(&user_json[0]) {
-            Ok(user) => Ok(Some(user)),
-            Err(e) => Err(rusqlite::Error::InvalidParameterName(format!(
-                "Error parsing user: {}",
-                e
-            ))),
-        }
+        Ok(Some(user_json[0].clone()))
     }
 
-    pub fn get_user_updates_by_date(&self, last_edit: DateTime<Utc>) -> Result<Vec<User>> {
+    pub fn get_user_updates_by_date(&self, last_edit: DateTime<Utc>) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT * FROM {} WHERE lastEdit >= ?",
+            "SELECT * FROM {} WHERE deleted = 0 AND lastEdit >= ? ORDER BY lastEdit ASC",
             UserTable::TABLE_NAME
         );
 
@@ -93,12 +43,14 @@ impl UserLocalStorage {
             let role: i32 = row.get(2)?;
             let name: String = row.get(3)?;
 
-            Ok(User {
-                id,
-                last_edit,
-                role,
-                name,
-            })
+            let user_json = serde_json::json!({
+                "id": id,
+                "lastEdit": last_edit,
+                "role": role,
+                "name": name,
+            });
+
+            Ok(user_json)
         })?;
 
         let mut users = Vec::new();
@@ -112,11 +64,10 @@ impl UserLocalStorage {
         Ok(users)
     }
 
-    pub fn save_user(&self, user: &User) -> Result<i64> {
-        let json_data = user.to_json();
+    pub fn save_user(&self, user_data: &Value) -> Result<i64> {
         let result = self
             .core_storage
-            .insert_or_update(UserTable::TABLE_NAME, &json_data)?;
+            .insert_or_update(UserTable::TABLE_NAME, user_data)?;
 
         Ok(result)
     }

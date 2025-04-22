@@ -23,13 +23,8 @@ impl PhotoLocalStorage {
 
     pub fn get_photo_updates_by_date(&self, last_edit: DateTime<Utc>) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT {}, {}, {}, {} FROM {} WHERE {} >= ?",
-            PhotoTable::COLUMN_ID,
-            PhotoTable::COLUMN_LAST_EDIT,
-            PhotoTable::COLUMN_PHOTO,
-            PhotoTable::COLUMN_LOCATION_ID,
+            "SELECT * FROM {} WHERE deleted = 0 AND lastEdit >= ? ORDER BY lastEdit ASC",
             PhotoTable::TABLE_NAME,
-            PhotoTable::COLUMN_LAST_EDIT,
         );
 
         let conn = self.core_storage.get_connection()?;

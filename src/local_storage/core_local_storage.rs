@@ -1,6 +1,6 @@
-use rusqlite::{params, Connection, Result};
-use serde_json;
 use base64::prelude::*;
+use rusqlite::{Connection, Result, params};
+use serde_json;
 use std::sync::Mutex;
 
 pub struct CoreLocalStorage {
@@ -10,13 +10,22 @@ pub struct CoreLocalStorage {
 impl CoreLocalStorage {
     pub fn new(db_path: &str) -> Result<Self> {
         let conn = Connection::open(db_path)?;
-        Ok(CoreLocalStorage { connection: Mutex::new(conn) })
+
+        Ok(CoreLocalStorage {
+            connection: Mutex::new(conn),
+        })
     }
 
     pub fn get_connection(&self) -> Result<std::sync::MutexGuard<Connection>> {
-        self.connection.lock().map_err(|_| rusqlite::Error::ExecuteReturnedResults)
+        match self.connection.lock() {
+            Ok(guard) => Ok(guard),
+            Err(e) => {
+                eprintln!("Failed to acquire database lock: {:?}", e);
+                Err(rusqlite::Error::ExecuteReturnedResults)
+            }
+        }
     }
-    
+
     pub fn get_by_id(&self, table_name: &str, id: &str) -> Result<Vec<serde_json::Value>> {
         let conn = self.get_connection()?;
         let query = format!("SELECT * FROM {} WHERE id = ?", table_name);

@@ -2,89 +2,8 @@ use crate::local_storage::contract::contract_tables::ContractTable;
 use crate::local_storage::core_local_storage::CoreLocalStorage;
 use chrono::{DateTime, Utc};
 use rusqlite::{Result, params};
-use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::sync::Arc;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Contract {
-    pub id: String,
-    pub done: bool,
-    pub last_edit: String,
-    pub title: String,
-    pub additional_info: String,
-    pub start_date: String,
-    pub end_date: String,
-    pub available_quantity: f64,
-    pub booked_quantity: f64,
-    pub shipped_quantity: f64,
-}
-
-impl Contract {
-    pub fn to_json(&self) -> serde_json::Value {
-        serde_json::json!({
-            "id": self.id,
-            "done": if self.done { 1 } else { 0 },
-            "lastEdit": self.last_edit,
-            "title": self.title,
-            "additionalInfo": self.additional_info,
-            "startDate": self.start_date,
-            "endDate": self.end_date,
-            "availableQuantity": self.available_quantity,
-            "bookedQuantity": self.booked_quantity,
-            "shippedQuantity": self.shipped_quantity,
-        })
-    }
-
-    pub fn from_json(json: &serde_json::Value) -> Result<Self, serde_json::Error> {
-        let done_val = json.get("done").and_then(|v| v.as_i64()).unwrap_or(0);
-
-        Ok(Contract {
-            id: json
-                .get("id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-            done: done_val != 0,
-            last_edit: json
-                .get("lastEdit")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-            title: json
-                .get("title")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-            additional_info: json
-                .get("additionalInfo")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-            start_date: json
-                .get("startDate")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-            end_date: json
-                .get("endDate")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-            available_quantity: json
-                .get("availableQuantity")
-                .and_then(|v| v.as_f64())
-                .unwrap_or(0.0),
-            booked_quantity: json
-                .get("bookedQuantity")
-                .and_then(|v| v.as_f64())
-                .unwrap_or(0.0),
-            shipped_quantity: json
-                .get("shippedQuantity")
-                .and_then(|v| v.as_f64())
-                .unwrap_or(0.0),
-        })
-    }
-}
 
 pub struct ContractLocalStorage {
     core_storage: Arc<CoreLocalStorage>,
@@ -99,16 +18,16 @@ impl ContractLocalStorage {
         Ok(storage)
     }
 
-    pub fn get_contract_updates_by_date(&self, last_edit: DateTime<Utc>) -> Result<Vec<Contract>> {
+    pub fn get_contract_updates_by_date(&self, last_edit: DateTime<Utc>) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT * FROM {} WHERE lastEdit >= ?",
+            "SELECT * FROM {} WHERE deleted = 0 AND lastEdit >= ? ORDER BY lastEdit ASC",
             ContractTable::TABLE_NAME
         );
 
         let conn = self.core_storage.get_connection()?;
         let mut stmt = conn.prepare(&query)?;
 
-        let rows = stmt.query_map(params![last_edit.to_rfc3339(),], |row| {
+        let rows = stmt.query_map(params![last_edit.to_rfc3339()], |row| {
             let id: String = row.get(0)?;
             let done: i64 = row.get(1)?;
             let last_edit: String = row.get(2)?;
@@ -120,18 +39,20 @@ impl ContractLocalStorage {
             let booked_quantity: f64 = row.get(8)?;
             let shipped_quantity: f64 = row.get(9)?;
 
-            Ok(Contract {
-                id,
-                done: done != 0,
-                last_edit,
-                title,
-                additional_info,
-                start_date,
-                end_date,
-                available_quantity,
-                booked_quantity,
-                shipped_quantity,
-            })
+            let contract_json = serde_json::json!({
+                "id": id,
+                "done": done,
+                "lastEdit": last_edit,
+                "title": title,
+                "additionalInfo": additional_info,
+                "startDate": start_date,
+                "endDate": end_date,
+                "availableQuantity": available_quantity,
+                "bookedQuantity": booked_quantity,
+                "shippedQuantity": shipped_quantity,
+            });
+
+            Ok(contract_json)
         })?;
 
         let mut contracts = Vec::new();
@@ -145,11 +66,10 @@ impl ContractLocalStorage {
         Ok(contracts)
     }
 
-    pub fn save_contract(&self, contract: &Contract) -> Result<i64> {
-        let json_data = contract.to_json();
+    pub fn save_contract(&self, contract_data: &Value) -> Result<i64> {
         let result = self
             .core_storage
-            .insert_or_update(ContractTable::TABLE_NAME, &json_data)?;
+            .insert_or_update(ContractTable::TABLE_NAME, contract_data)?;
 
         Ok(result)
     }

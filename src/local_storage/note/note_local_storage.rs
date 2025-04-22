@@ -2,52 +2,8 @@ use crate::local_storage::core_local_storage::CoreLocalStorage;
 use crate::local_storage::note::note_tables::NoteTable;
 use chrono::{DateTime, Utc};
 use rusqlite::{Result, params};
-use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::sync::Arc;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Note {
-    pub id: String,
-    pub last_edit: String,
-    pub text: String,
-    pub user_id: String,
-}
-
-impl Note {
-    pub fn to_json(&self) -> serde_json::Value {
-        serde_json::json!({
-            "id": self.id,
-            "lastEdit": self.last_edit,
-            "text": self.text,
-            "userId": self.user_id,
-        })
-    }
-
-    pub fn from_json(json: &serde_json::Value) -> Result<Self, serde_json::Error> {
-        Ok(Note {
-            id: json
-                .get("id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-            last_edit: json
-                .get("lastEdit")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-            text: json
-                .get("text")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-            user_id: json
-                .get("userId")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-        })
-    }
-}
 
 pub struct NoteLocalStorage {
     core_storage: Arc<CoreLocalStorage>,
@@ -62,9 +18,9 @@ impl NoteLocalStorage {
         Ok(storage)
     }
 
-    pub fn get_note_updates_by_date(&self, last_edit: DateTime<Utc>) -> Result<Vec<Note>> {
+    pub fn get_note_updates_by_date(&self, last_edit: DateTime<Utc>) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT * FROM {} WHERE lastEdit >= ?",
+            "SELECT * FROM {} WHERE deleted = 0 AND lastEdit >= ? ORDER BY lastEdit ASC",
             NoteTable::TABLE_NAME
         );
 
@@ -77,12 +33,14 @@ impl NoteLocalStorage {
             let text: String = row.get(2)?;
             let user_id: String = row.get(3)?;
 
-            Ok(Note {
-                id,
-                last_edit,
-                text,
-                user_id,
-            })
+            let note_json = serde_json::json!({
+                "id": id,
+                "lastEdit": last_edit,
+                "text": text,
+                "userId": user_id,
+            });
+
+            Ok(note_json)
         })?;
 
         let mut notes = Vec::new();
@@ -96,11 +54,10 @@ impl NoteLocalStorage {
         Ok(notes)
     }
 
-    pub fn save_note(&self, note: &Note) -> Result<i64> {
-        let json_data = note.to_json();
+    pub fn save_note(&self, note_data: &Value) -> Result<i64> {
         let result = self
             .core_storage
-            .insert_or_update(NoteTable::TABLE_NAME, &json_data)?;
+            .insert_or_update(NoteTable::TABLE_NAME, note_data)?;
 
         Ok(result)
     }
