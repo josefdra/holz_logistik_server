@@ -7,7 +7,7 @@ use local_storage::location::location_local_storage::{Location, LocationLocalSto
 use local_storage::location::location_tables::{LocationSawmillJunctionTable, LocationTable};
 use local_storage::note::note_local_storage::{Note, NoteLocalStorage};
 use local_storage::note::note_tables::NoteTable;
-use local_storage::photo::photo_local_storage::{Photo, PhotoLocalStorage};
+use local_storage::photo::photo_local_storage::PhotoLocalStorage;
 use local_storage::photo::photo_tables::PhotoTable;
 use local_storage::sawmill::sawmill_local_storage::{Sawmill, SawmillLocalStorage};
 use local_storage::sawmill::sawmill_tables::SawmillTable;
@@ -400,16 +400,9 @@ fn handle_note_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
 fn handle_photo_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
     match PhotoLocalStorage::new(core_storage) {
         Ok(photo_storage) => {
-            println!("Photo update received: {:?}", data);
-            match Photo::from_json(data) {
-                Ok(photo) => {
-                    if let Err(e) = photo_storage.save_photo(&photo) {
-                        println!("Failed to save photo: {:?}", e);
-                    }
-                }
-                Err(e) => {
-                    println!("Failed to parse photo data: {:?}", e);
-                }
+            println!("Photo update received");
+            if let Err(e) = photo_storage.save_photo(data) {
+                println!("Failed to save photo: {:?}", e);
             }
         }
         Err(e) => {
@@ -647,13 +640,12 @@ async fn send_photo_data(
     for photo in &photos {
         let response = serde_json::json!({
             "type": "photo_update",
-            "data": photo.to_json(),
+            "data": photo,
             "timestamp": chrono::Utc::now().to_rfc3339()
         });
 
         send_message(client_id.clone(), &response.to_string(), clients).await;
-        
-        // Add small delay to avoid flooding the client
+
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
     }
 
@@ -818,10 +810,7 @@ async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients)
         .get("sawmill_date")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let last_note_sync = data
-        .get("note_date")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let last_note_sync = data.get("note_date").and_then(|v| v.as_str()).unwrap_or("");
     let last_photo_sync = data
         .get("photo_date")
         .and_then(|v| v.as_str())
@@ -830,63 +819,140 @@ async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients)
         .get("shipment_date")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let last_user_sync = data
-        .get("user_date")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let last_user_sync = data.get("user_date").and_then(|v| v.as_str()).unwrap_or("");
 
     let mut all_syncs_completed = true;
 
-    all_syncs_completed &= send_user_data(
+    // User data sync
+    let user_sync_result = send_user_data(
         last_user_sync,
         client_id.clone(),
         core_storage.clone(),
         clients,
     )
     .await;
-    all_syncs_completed &= send_sawmill_data(
+    println!(
+        "User data sync: {}",
+        if user_sync_result {
+            "Success"
+        } else {
+            "Failed"
+        }
+    );
+    all_syncs_completed &= user_sync_result;
+
+    // Sawmill data sync
+    let sawmill_sync_result = send_sawmill_data(
         last_sawmill_sync,
         client_id.clone(),
         core_storage.clone(),
         clients,
     )
     .await;
-    all_syncs_completed &= send_contract_data(
+    println!(
+        "Sawmill data sync: {}",
+        if sawmill_sync_result {
+            "Success"
+        } else {
+            "Failed"
+        }
+    );
+    all_syncs_completed &= sawmill_sync_result;
+
+    // Contract data sync
+    let contract_sync_result = send_contract_data(
         last_contract_sync,
         client_id.clone(),
         core_storage.clone(),
         clients,
     )
     .await;
-    all_syncs_completed &= send_photo_data(
+    println!(
+        "Contract data sync: {}",
+        if contract_sync_result {
+            "Success"
+        } else {
+            "Failed"
+        }
+    );
+    all_syncs_completed &= contract_sync_result;
+
+    // Photo data sync
+    let photo_sync_result = send_photo_data(
         last_photo_sync,
         client_id.clone(),
         core_storage.clone(),
         clients,
     )
     .await;
-    all_syncs_completed &= send_note_data(
+    println!(
+        "Photo data sync: {}",
+        if photo_sync_result {
+            "Success"
+        } else {
+            "Failed"
+        }
+    );
+    all_syncs_completed &= photo_sync_result;
+
+    // Note data sync
+    let note_sync_result = send_note_data(
         last_note_sync,
         client_id.clone(),
         core_storage.clone(),
         clients,
     )
     .await;
-    all_syncs_completed &= send_location_data(
+    println!(
+        "Note data sync: {}",
+        if note_sync_result {
+            "Success"
+        } else {
+            "Failed"
+        }
+    );
+    all_syncs_completed &= note_sync_result;
+
+    // Location data sync
+    let location_sync_result = send_location_data(
         last_location_sync,
         client_id.clone(),
         core_storage.clone(),
         clients,
     )
     .await;
-    all_syncs_completed &= send_shipment_data(
+    println!(
+        "Location data sync: {}",
+        if location_sync_result {
+            "Success"
+        } else {
+            "Failed"
+        }
+    );
+    all_syncs_completed &= location_sync_result;
+
+    // Shipment data sync
+    let shipment_sync_result = send_shipment_data(
         last_shipment_sync,
         client_id.clone(),
         core_storage.clone(),
         clients,
     )
     .await;
+    println!(
+        "Shipment data sync: {}",
+        if shipment_sync_result {
+            "Success"
+        } else {
+            "Failed"
+        }
+    );
+    all_syncs_completed &= shipment_sync_result;
 
+    println!(
+        "All syncs completed: {}",
+        if all_syncs_completed { "Yes" } else { "No" }
+    );
     all_syncs_completed
 }
 
