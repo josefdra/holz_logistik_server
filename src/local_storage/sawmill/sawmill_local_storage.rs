@@ -61,7 +61,7 @@ impl SawmillLocalStorage {
             SawmillTable::TABLE_NAME
         );
 
-        let conn = self.core_storage.get_connection();
+        let conn = self.core_storage.get_connection()?;
         let mut stmt = conn.prepare(&query)?;
 
         let rows = stmt.query_map(params![last_edit.to_rfc3339()], |row| {

@@ -73,7 +73,7 @@ impl PhotoLocalStorage {
             PhotoTable::COLUMN_LAST_EDIT,
         );
 
-        let conn = self.core_storage.get_connection();
+        let conn = self.core_storage.get_connection()?;
         let mut stmt = conn.prepare(&query)?;
 
         let rows = stmt.query_map(params![last_edit.to_rfc3339()], |row| {
@@ -102,11 +102,26 @@ impl PhotoLocalStorage {
     }
 
     pub fn save_photo(&self, photo: &Photo) -> Result<i64> {
-        let json_data = photo.to_json();
-        let result = self
-            .core_storage
-            .insert_or_update(PhotoTable::TABLE_NAME, &json_data)?;
+        let conn = self.core_storage.get_connection()?;
+        let query = format!(
+            "INSERT OR REPLACE INTO {} ({}, {}, {}, {}) VALUES (?, ?, ?, ?)",
+            PhotoTable::TABLE_NAME,
+            PhotoTable::COLUMN_ID,
+            PhotoTable::COLUMN_LAST_EDIT,
+            PhotoTable::COLUMN_PHOTO,
+            PhotoTable::COLUMN_LOCATION_ID
+        );
 
-        Ok(result)
+        let result = conn.execute(
+            &query,
+            params![
+                photo.id,
+                photo.last_edit,
+                photo.photo_file,
+                photo.location_id
+            ],
+        )?;
+
+        Ok(result as i64)
     }
 }

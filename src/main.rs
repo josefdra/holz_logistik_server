@@ -485,6 +485,310 @@ fn handle_user_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
     }
 }
 
+async fn send_user_data(
+    last_sync: &str,
+    client_id: String,
+    core_storage: Arc<CoreLocalStorage>,
+    clients: &Clients,
+) -> bool {
+    let user_storage = match UserLocalStorage::new(core_storage) {
+        Ok(storage) => storage,
+        Err(e) => {
+            println!("Failed to create user storage: {:?}", e);
+            return false;
+        }
+    };
+
+    let date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
+        Ok(date) => date.with_timezone(&chrono::Utc),
+        Err(e) => {
+            println!("Failed to parse last sync date: {:?}", e);
+            chrono::Utc::now() - chrono::Duration::days(365 * 10)
+        }
+    };
+
+    let users = match user_storage.get_user_updates_by_date(date) {
+        Ok(users) => users,
+        Err(e) => {
+            println!("Failed to get user updates: {:?}", e);
+            return false;
+        }
+    };
+
+    for user in &users {
+        let response = serde_json::json!({
+            "type": "user_update",
+            "data": user.to_json(),
+            "timestamp": chrono::Utc::now().to_rfc3339()
+        });
+
+        send_message(client_id.clone(), &response.to_string(), clients).await;
+    }
+
+    true
+}
+
+async fn send_sawmill_data(
+    last_sync: &str,
+    client_id: String,
+    core_storage: Arc<CoreLocalStorage>,
+    clients: &Clients,
+) -> bool {
+    let sawmill_storage = match SawmillLocalStorage::new(core_storage) {
+        Ok(storage) => storage,
+        Err(e) => {
+            println!("Failed to create sawmill storage: {:?}", e);
+            return false;
+        }
+    };
+
+    let date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
+        Ok(date) => date.with_timezone(&chrono::Utc),
+        Err(e) => {
+            println!("Failed to parse last sync date: {:?}", e);
+            chrono::Utc::now() - chrono::Duration::days(365 * 10)
+        }
+    };
+
+    let sawmills = match sawmill_storage.get_sawmill_updates_by_date(date) {
+        Ok(sawmills) => sawmills,
+        Err(e) => {
+            println!("Failed to get sawmill updates: {:?}", e);
+            return false;
+        }
+    };
+
+    for sawmill in &sawmills {
+        let response = serde_json::json!({
+            "type": "sawmill_update",
+            "data": sawmill.to_json(),
+            "timestamp": chrono::Utc::now().to_rfc3339()
+        });
+
+        send_message(client_id.clone(), &response.to_string(), clients).await;
+    }
+
+    true
+}
+
+async fn send_contract_data(
+    last_sync: &str,
+    client_id: String,
+    core_storage: Arc<CoreLocalStorage>,
+    clients: &Clients,
+) -> bool {
+    let contract_storage = match ContractLocalStorage::new(core_storage) {
+        Ok(storage) => storage,
+        Err(e) => {
+            println!("Failed to create contract storage: {:?}", e);
+            return false;
+        }
+    };
+
+    let date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
+        Ok(date) => date.with_timezone(&chrono::Utc),
+        Err(e) => {
+            println!("Failed to parse last sync date: {:?}", e);
+            chrono::Utc::now() - chrono::Duration::days(365 * 10)
+        }
+    };
+
+    let contracts = match contract_storage.get_contract_updates_by_date(date) {
+        Ok(contracts) => contracts,
+        Err(e) => {
+            println!("Failed to get contract updates: {:?}", e);
+            return false;
+        }
+    };
+
+    for contract in &contracts {
+        let response = serde_json::json!({
+            "type": "contract_update",
+            "data": contract.to_json(),
+            "timestamp": chrono::Utc::now().to_rfc3339()
+        });
+
+        send_message(client_id.clone(), &response.to_string(), clients).await;
+    }
+
+    true
+}
+
+async fn send_photo_data(
+    last_sync: &str,
+    client_id: String,
+    core_storage: Arc<CoreLocalStorage>,
+    clients: &Clients,
+) -> bool {
+    let photo_storage = match PhotoLocalStorage::new(core_storage) {
+        Ok(storage) => storage,
+        Err(e) => {
+            println!("Failed to create photo storage: {:?}", e);
+            return false;
+        }
+    };
+
+    let date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
+        Ok(date) => date.with_timezone(&chrono::Utc),
+        Err(e) => {
+            println!("Failed to parse last sync date: {:?}", e);
+            chrono::Utc::now() - chrono::Duration::days(365 * 10)
+        }
+    };
+
+    let photos = match photo_storage.get_photo_updates_by_date(date) {
+        Ok(photos) => photos,
+        Err(e) => {
+            println!("Failed to get photo updates: {:?}", e);
+            return false;
+        }
+    };
+
+    for photo in &photos {
+        let response = serde_json::json!({
+            "type": "photo_update",
+            "data": photo.to_json(),
+            "timestamp": chrono::Utc::now().to_rfc3339()
+        });
+
+        send_message(client_id.clone(), &response.to_string(), clients).await;
+        
+        // Add small delay to avoid flooding the client
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+    }
+
+    true
+}
+
+async fn send_note_data(
+    last_sync: &str,
+    client_id: String,
+    core_storage: Arc<CoreLocalStorage>,
+    clients: &Clients,
+) -> bool {
+    let note_storage = match NoteLocalStorage::new(core_storage) {
+        Ok(storage) => storage,
+        Err(e) => {
+            println!("Failed to create note storage: {:?}", e);
+            return false;
+        }
+    };
+
+    let date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
+        Ok(date) => date.with_timezone(&chrono::Utc),
+        Err(e) => {
+            println!("Failed to parse last sync date: {:?}", e);
+            chrono::Utc::now() - chrono::Duration::days(365 * 10)
+        }
+    };
+
+    let notes = match note_storage.get_note_updates_by_date(date) {
+        Ok(notes) => notes,
+        Err(e) => {
+            println!("Failed to get note updates: {:?}", e);
+            return false;
+        }
+    };
+
+    for note in &notes {
+        let response = serde_json::json!({
+            "type": "note_update",
+            "data": note.to_json(),
+            "timestamp": chrono::Utc::now().to_rfc3339()
+        });
+
+        send_message(client_id.clone(), &response.to_string(), clients).await;
+    }
+
+    true
+}
+
+async fn send_location_data(
+    last_sync: &str,
+    client_id: String,
+    core_storage: Arc<CoreLocalStorage>,
+    clients: &Clients,
+) -> bool {
+    let location_storage = match LocationLocalStorage::new(core_storage) {
+        Ok(storage) => storage,
+        Err(e) => {
+            println!("Failed to create location storage: {:?}", e);
+            return false;
+        }
+    };
+
+    let date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
+        Ok(date) => date.with_timezone(&chrono::Utc),
+        Err(e) => {
+            println!("Failed to parse last sync date: {:?}", e);
+            chrono::Utc::now() - chrono::Duration::days(365 * 10)
+        }
+    };
+
+    let locations = match location_storage.get_location_updates_by_date(date) {
+        Ok(locations) => locations,
+        Err(e) => {
+            println!("Failed to get location updates: {:?}", e);
+            return false;
+        }
+    };
+
+    for location in &locations {
+        let response = serde_json::json!({
+            "type": "location_update",
+            "data": location.to_json(),
+            "timestamp": chrono::Utc::now().to_rfc3339()
+        });
+
+        send_message(client_id.clone(), &response.to_string(), clients).await;
+    }
+
+    true
+}
+
+async fn send_shipment_data(
+    last_sync: &str,
+    client_id: String,
+    core_storage: Arc<CoreLocalStorage>,
+    clients: &Clients,
+) -> bool {
+    let shipment_storage = match ShipmentLocalStorage::new(core_storage) {
+        Ok(storage) => storage,
+        Err(e) => {
+            println!("Failed to create shipment storage: {:?}", e);
+            return false;
+        }
+    };
+
+    let date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
+        Ok(date) => date.with_timezone(&chrono::Utc),
+        Err(e) => {
+            println!("Failed to parse last sync date: {:?}", e);
+            chrono::Utc::now() - chrono::Duration::days(365 * 10)
+        }
+    };
+
+    let shipments = match shipment_storage.get_shipments_by_date(date) {
+        Ok(shipments) => shipments,
+        Err(e) => {
+            println!("Failed to get shipment updates: {:?}", e);
+            return false;
+        }
+    };
+
+    for shipment in &shipments {
+        let response = serde_json::json!({
+            "type": "shipment_update",
+            "data": shipment.to_json(),
+            "timestamp": chrono::Utc::now().to_rfc3339()
+        });
+
+        send_message(client_id.clone(), &response.to_string(), clients).await;
+    }
+
+    true
+}
+
 async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients) -> bool {
     let db_path = match get_client_db_path(&client_id, clients) {
         Some(path) => path,
@@ -503,31 +807,31 @@ async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients)
     };
 
     let last_contract_sync = data
-        .get("last_contract_sync")
+        .get("contract_date")
         .and_then(|v| v.as_str())
         .unwrap_or("");
     let last_location_sync = data
-        .get("last_location_sync")
+        .get("location_date")
         .and_then(|v| v.as_str())
         .unwrap_or("");
     let last_sawmill_sync = data
-        .get("last_sawmill_sync")
+        .get("sawmill_date")
         .and_then(|v| v.as_str())
         .unwrap_or("");
     let last_note_sync = data
-        .get("last_note_sync")
+        .get("note_date")
         .and_then(|v| v.as_str())
         .unwrap_or("");
     let last_photo_sync = data
-        .get("last_photo_sync")
+        .get("photo_date")
         .and_then(|v| v.as_str())
         .unwrap_or("");
     let last_shipment_sync = data
-        .get("last_shipment_sync")
+        .get("shipment_date")
         .and_then(|v| v.as_str())
         .unwrap_or("");
     let last_user_sync = data
-        .get("last_user_sync")
+        .get("user_date")
         .and_then(|v| v.as_str())
         .unwrap_or("");
 

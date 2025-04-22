@@ -198,7 +198,7 @@ impl LocationLocalStorage {
             LocationSawmillJunctionTable::COLUMN_IS_OVERSIZE
         );
 
-        let conn = self.core_storage.get_connection();
+        let conn = self.core_storage.get_connection()?;
         let mut stmt = conn.prepare(&query)?;
         let is_oversize_val = if is_oversize { 1 } else { 0 };
 
@@ -225,7 +225,7 @@ impl LocationLocalStorage {
             LocationTable::COLUMN_LAST_EDIT,
         );
 
-        let conn = self.core_storage.get_connection();
+        let conn = self.core_storage.get_connection()?;
         let mut stmt = conn.prepare(&query)?;
 
         let rows = stmt.query_map(params![last_edit.to_rfc3339()], |row| {
