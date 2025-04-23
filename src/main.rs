@@ -451,11 +451,19 @@ async fn send_user_data(
         Ok(date) => date.with_timezone(&chrono::Utc),
         Err(e) => {
             println!("Failed to parse last sync date: {:?}", e);
-            chrono::Utc::now() - chrono::Duration::days(365 * 10)
+            chrono::Utc::now() - chrono::Duration::days(365 * 30)
         }
     };
 
     let mut should_continue = true;
+
+    let response = serde_json::json!({
+        "type": "hello",
+        "data": "1",
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    });
+
+    send_message(client_id.clone(), &response.to_string(), clients).await;
 
     while should_continue {
         let users = match user_storage.get_user_updates_by_date(date) {
@@ -469,15 +477,13 @@ async fn send_user_data(
         if users.is_empty() {
             should_continue = false;
         } else {
-            for user in &users {
-                let response = serde_json::json!({
-                    "type": "user_update",
-                    "data": user,
-                    "timestamp": chrono::Utc::now().to_rfc3339()
-                });
+            let response = serde_json::json!({
+                "type": "user_sync",
+                "data": users,
+                "timestamp": chrono::Utc::now().to_rfc3339()
+            });
 
-                send_message(client_id.clone(), &response.to_string(), clients).await;
-            }
+            send_message(client_id.clone(), &response.to_string(), clients).await;
 
             if let Some(newest_user) = users.last() {
                 if let Some(last_edit_str) = newest_user["lastEdit"].as_str() {
@@ -655,21 +661,26 @@ async fn send_photo_data(
             let mut newest_date = date;
             if let Some(newest_photo) = photos.last() {
                 if let Some(last_edit_str) = newest_photo["lastEdit"].as_str() {
-                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str) {
+                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str)
+                    {
                         newest_date = last_edit_date.with_timezone(&chrono::Utc);
                         newest_date = newest_date + chrono::Duration::milliseconds(1);
                     }
                 }
             }
 
-            let responses: Vec<String> = photos.iter().map(|photo| {
-                serde_json::json!({
-                    "type": "photo_update",
-                    "data": photo,
-                    "timestamp": chrono::Utc::now().to_rfc3339()
-                }).to_string()
-            }).collect();
-            
+            let responses: Vec<String> = photos
+                .iter()
+                .map(|photo| {
+                    serde_json::json!({
+                        "type": "photo_update",
+                        "data": photo,
+                        "timestamp": chrono::Utc::now().to_rfc3339()
+                    })
+                    .to_string()
+                })
+                .collect();
+
             for response in responses {
                 send_message(client_id.clone(), &response, clients).await;
                 tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
@@ -1006,20 +1017,36 @@ async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients)
 }
 
 async fn send_message(client_id: String, msg: &str, clients: &Clients) {
+    println!("Attempting to send message to client: {}", client_id);
+    println!("Message content: {}", msg);
+    
     match clients.lock() {
         Ok(clients_lock) => {
+            println!("Successfully acquired clients lock");
+            println!("Number of clients in map: {}", clients_lock.len());
+            
             if let Some(client) = clients_lock.get(&client_id) {
-                if let Err(e) = client.sender.send(Message::text(msg)) {
-                    println!("Error sending message to client {}: {:?}", client_id, e);
+                println!("Found client {} in clients map", client_id);
+                
+                match client.sender.send(Message::text(msg)) {
+                    Ok(_) => {
+                        println!("Successfully sent message to client {}", client_id);
+                    },
+                    Err(e) => {
+                        println!("Error sending message to client {}: {:?}", client_id, e);
+                        println!("Client sender might be disconnected or closed");
+                    }
                 }
             } else {
-                println!("Client {} not found", client_id);
+                println!("Client {} not found in clients map", client_id);
+                println!("Available client IDs: {:?}", clients_lock.keys().collect::<Vec<_>>());
             }
         }
         Err(e) => {
-            println!("Failed to lock clients: {:?}", e);
+            println!("Failed to lock clients mutex: {:?}", e);
         }
     }
+    println!("send_message function completed for client: {}", client_id);
 }
 
 async fn send_pong(client_id: String, clients: &Clients) {
