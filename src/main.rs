@@ -1054,6 +1054,7 @@ async fn authenticate_client(
         match result {
             Ok(msg) => {
                 if let Some(text) = msg.to_str().ok() {
+                    println!("{}", text);
                     if let Ok(json_msg) = serde_json::from_str::<Value>(text) {
                         if json_msg.get("type").and_then(|v| v.as_str())
                             == Some("authentication_request")
@@ -1081,8 +1082,6 @@ async fn handle_authenticated_client(
     mut ws_rx: futures_util::stream::SplitStream<WebSocket>,
     clients: Clients,
 ) {
-    let mut sync_complete = false;
-
     while let Some(result) = ws_rx.next().await {
         match result {
             Ok(msg) => {
@@ -1101,13 +1100,9 @@ async fn handle_authenticated_client(
                             send_pong(client_id.clone(), &clients).await;
                         } else if msg_type == "sync_request" {
                             handle_sync_request(&data, client_id.clone(), &clients).await;
-                        } else if msg_type == "sync_complete" {
-                            sync_complete = true;
                         } else {
                             handle_client_message(msg_type, &data, &client_id, &clients).await;
-                            if sync_complete {
-                                broadcast_message(client_id.clone(), text, &clients).await;
-                            }
+                            broadcast_message(client_id.clone(), text, &clients).await;
                         }
                     }
                 }
