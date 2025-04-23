@@ -1,6 +1,6 @@
 use crate::local_storage::core_local_storage::CoreLocalStorage;
 use crate::local_storage::user::user_tables::UserTable;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use rusqlite::{Result, params};
 use serde_json::Value;
 use std::sync::Arc;
@@ -30,14 +30,15 @@ impl UserLocalStorage {
 
     pub fn get_user_updates_by_date(&self, last_edit: DateTime<Utc>) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT * FROM {} WHERE deleted = 0 AND lastEdit >= ? ORDER BY lastEdit ASC",
+            "SELECT * FROM {} WHERE deleted = 0 AND lastEdit > ? ORDER BY lastEdit ASC",
             UserTable::TABLE_NAME
         );
 
         let conn = self.core_storage.get_connection()?;
         let mut stmt = conn.prepare(&query)?;
-
-        let rows = stmt.query_map(params![last_edit.to_rfc3339()], |row| {
+        
+        let slightly_newer = last_edit + Duration::milliseconds(1);
+        let rows = stmt.query_map(params![slightly_newer.to_rfc3339()], |row| {
             let id: String = row.get(0)?;
             let last_edit: String = row.get(1)?;
             let role: i32 = row.get(2)?;

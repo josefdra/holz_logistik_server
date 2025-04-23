@@ -439,7 +439,6 @@ async fn send_user_data(
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
 ) -> bool {
-    println!("Starting user data sync");
     let user_storage = match UserLocalStorage::new(core_storage) {
         Ok(storage) => storage,
         Err(e) => {
@@ -491,7 +490,6 @@ async fn send_user_data(
             }
         }
     }
-    println!("Ending user data sync");
 
     true
 }
@@ -502,7 +500,6 @@ async fn send_sawmill_data(
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
 ) -> bool {
-    println!("starting sawmill data sync");
     let sawmill_storage = match SawmillLocalStorage::new(core_storage) {
         Ok(storage) => storage,
         Err(e) => {
@@ -555,7 +552,6 @@ async fn send_sawmill_data(
         }
     }
 
-    println!("Ending sawmill data sync");
     true
 }
 
@@ -565,7 +561,6 @@ async fn send_contract_data(
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
 ) -> bool {
-    println!("Starting contract data sync");
     let contract_storage = match ContractLocalStorage::new(core_storage) {
         Ok(storage) => storage,
         Err(e) => {
@@ -618,7 +613,6 @@ async fn send_contract_data(
         }
     }
 
-    println!("Ending contract data sync");
     true
 }
 
@@ -628,7 +622,6 @@ async fn send_photo_data(
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
 ) -> bool {
-    println!("Starting photo data sync");
     let photo_storage = match PhotoLocalStorage::new(core_storage) {
         Ok(storage) => storage,
         Err(e) => {
@@ -686,7 +679,6 @@ async fn send_photo_data(
         }
     }
 
-    println!("Ending photo data sync");
     true
 }
 
@@ -696,7 +688,6 @@ async fn send_note_data(
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
 ) -> bool {
-    println!("Starting note data sync");
     let note_storage = match NoteLocalStorage::new(core_storage) {
         Ok(storage) => storage,
         Err(e) => {
@@ -749,7 +740,6 @@ async fn send_note_data(
         }
     }
 
-    println!("Ending note data sync");
     true
 }
 
@@ -759,7 +749,6 @@ async fn send_location_data(
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
 ) -> bool {
-    println!("Starting location data sync");
     let location_storage = match LocationLocalStorage::new(core_storage) {
         Ok(storage) => storage,
         Err(e) => {
@@ -812,7 +801,6 @@ async fn send_location_data(
         }
     }
 
-    println!("Ending location data sync");
     true
 }
 
@@ -822,7 +810,6 @@ async fn send_shipment_data(
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
 ) -> bool {
-    println!("Starting shipment data sync");
     let shipment_storage = match ShipmentLocalStorage::new(core_storage) {
         Ok(storage) => storage,
         Err(e) => {
@@ -875,7 +862,6 @@ async fn send_shipment_data(
         }
     }
 
-    println!("Ending shipment data sync");
     true
 }
 
@@ -1104,6 +1090,7 @@ async fn handle_authenticated_client(
             Ok(msg) => {
                 if let Some(text) = msg.to_str().ok() {
                     if let Ok(json_msg) = serde_json::from_str::<Value>(text) {
+                        println!("{}", text);
                         let msg_type = json_msg
                             .get("type")
                             .and_then(|v| v.as_str())
@@ -1117,6 +1104,8 @@ async fn handle_authenticated_client(
                             send_pong(client_id.clone(), &clients).await;
                         } else if msg_type == "sync_request" {
                             handle_sync_request(&data, client_id.clone(), &clients).await;
+                        } else if msg_type == "sync_complete" {
+                            println!("Sync from client complete");
                         } else {
                             handle_client_message(msg_type, &data, &client_id, &clients).await;
                             broadcast_message(client_id.clone(), text, &clients).await;
