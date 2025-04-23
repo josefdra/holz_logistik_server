@@ -25,7 +25,7 @@ PRAGMA busy_timeout = 10000;
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY NOT NULL,
-    lastEdit TEXT NOT NULL,
+    lastEdit INTEGER NOT NULL,
     role INTEGER NOT NULL,
     name TEXT NOT NULL,
     deleted INTEGER DEFAULT 0
@@ -35,11 +35,11 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS contracts (
     id TEXT PRIMARY KEY NOT NULL,
     done INTEGER NOT NULL,
-    lastEdit TEXT NOT NULL,
+    lastEdit INTEGER NOT NULL,
     title TEXT NOT NULL,
     additionalInfo TEXT NOT NULL,
-    startDate TEXT NOT NULL,
-    endDate TEXT NOT NULL,
+    startDate INTEGER NOT NULL,
+    endDate INTEGER NOT NULL,
     availableQuantity REAL NOT NULL,
     bookedQuantity REAL NOT NULL,
     shippedQuantity REAL NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS contracts (
 -- Sawmills table
 CREATE TABLE IF NOT EXISTS sawmills (
     id TEXT PRIMARY KEY NOT NULL,
-    lastEdit TEXT NOT NULL,
+    lastEdit INTEGER NOT NULL,
     name TEXT NOT NULL,
     deleted INTEGER DEFAULT 0
 );
@@ -59,11 +59,11 @@ CREATE TABLE IF NOT EXISTS locations (
     id TEXT PRIMARY KEY NOT NULL,
     done INTEGER NOT NULL,
     started INTEGER NOT NULL,
-    lastEdit TEXT NOT NULL,
+    lastEdit INTEGER NOT NULL,
     latitude REAL NOT NULL,
     longitude REAL NOT NULL,
     partieNr TEXT NOT NULL,
-    date TEXT NOT NULL,
+    date INTEGER NOT NULL,
     additionalInfo TEXT NOT NULL,
     initialQuantity REAL NOT NULL,
     initialOversizeQuantity REAL NOT NULL,
@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS locationSawmillJunction (
 -- Notes table
 CREATE TABLE IF NOT EXISTS notes (
     id TEXT PRIMARY KEY NOT NULL,
-    lastEdit TEXT NOT NULL,
+    lastEdit INTEGER NOT NULL,
     text TEXT NOT NULL,
     userId TEXT NOT NULL,
     deleted INTEGER DEFAULT 0
@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS notes (
 -- Photos table
 CREATE TABLE IF NOT EXISTS photos (
     id TEXT PRIMARY KEY NOT NULL,
-    lastEdit TEXT NOT NULL,
+    lastEdit INTEGER NOT NULL,
     photoFile BLOB NOT NULL,
     locationId TEXT NOT NULL,
     deleted INTEGER DEFAULT 0
@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS photos (
 -- Shipments table
 CREATE TABLE IF NOT EXISTS shipments (
     id TEXT PRIMARY KEY NOT NULL,
-    lastEdit TEXT NOT NULL,
+    lastEdit INTEGER NOT NULL,
     quantity REAL NOT NULL,
     oversizeQuantity REAL NOT NULL,
     pieceCount INTEGER NOT NULL,
@@ -126,7 +126,8 @@ JOSEF_EXISTS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE name='josef'
 
 # Create a test user with UUID only if no josef user exists
 if [ "$JOSEF_EXISTS" -eq "0" ]; then
-    NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    # Get current timestamp in seconds since epoch (UTC integer format)
+    UTC_TIMESTAMP=$(date +%s)
     UUID=$(uuidgen || (cat /proc/sys/kernel/random/uuid 2>/dev/null) || (python3 -c "import uuid; print(uuid.uuid4())") || echo "error-generating-uuid")
 
     if [ "$UUID" = "error-generating-uuid" ]; then
@@ -136,7 +137,7 @@ if [ "$JOSEF_EXISTS" -eq "0" ]; then
 
     sqlite3 "$DB_PATH" << EOL
     INSERT INTO users (id, name, role, lastEdit) 
-    VALUES ('$UUID', 'josef', 2, '$NOW');
+    VALUES ('$UUID', 'josef', 2, $UTC_TIMESTAMP);
 EOL
     echo "Created new josef user with ID: $UUID"
     USER_ID=$UUID

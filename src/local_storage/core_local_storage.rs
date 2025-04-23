@@ -125,26 +125,27 @@ impl CoreLocalStorage {
                     "Data must contain an 'id' field".to_string(),
                 ));
             }
-    
+
             let id = map.get("id").unwrap();
             let id_str = id.as_str().unwrap_or_default();
-    
+
             if !map.contains_key("lastEdit") {
                 return Err(rusqlite::Error::InvalidParameterName(
                     "Data must contain a 'lastEdit' field for timestamp comparison".to_string(),
                 ));
             }
-    
+
             let new_last_edit = match map.get("lastEdit") {
-                Some(serde_json::Value::String(ts)) => ts.clone(),
-                Some(serde_json::Value::Number(n)) => n.to_string(),
-                _ => return Err(rusqlite::Error::InvalidParameterName(
-                    "lastEdit must be a string or number".to_string(),
-                )),
+                Some(serde_json::Value::Number(n)) => n.as_i64().unwrap_or(0),
+                _ => {
+                    return Err(rusqlite::Error::InvalidParameterName(
+                        "lastEdit must be a number".to_string(),
+                    ));
+                }
             };
-    
+
             let conn = self.get_connection()?;
-            
+
             let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", table_name))?;
             let columns = stmt.query_map([], |row| Ok(row.get::<_, String>(1)?))?;
             let mut has_last_edit = false;
@@ -155,52 +156,39 @@ impl CoreLocalStorage {
                     break;
                 }
             }
-            
+
             if !has_last_edit {
             } else {
                 let query = format!("SELECT lastEdit FROM {} WHERE id = ?", table_name);
                 let mut stmt = conn.prepare(&query)?;
-                
-                let existing_last_edit: String = match stmt.query_row(params![id_str], |row| {
-                    let value = row.get_ref(0)?;
-                    match value.data_type() {
-                        rusqlite::types::Type::Text => Ok(row.get::<_, String>(0)?),
-                        rusqlite::types::Type::Integer => {
-                            let val: i64 = row.get(0)?;
-                            Ok(val.to_string())
-                        },
-                        rusqlite::types::Type::Real => {
-                            let val: f64 = row.get(0)?;
-                            Ok(val.to_string())
-                        },
-                        _ => Ok(String::from(""))
-                    }
-                }) {
-                    Ok(val) => val,
-                    Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(0), 
-                    Err(e) => return Err(e),
-                };
-                
+
+                let existing_last_edit: i64 =
+                    match stmt.query_row(params![id_str], |row| row.get::<_, i64>(0)) {
+                        Ok(val) => val,
+                        Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(0),
+                        Err(e) => return Err(e),
+                    };
+
                 if new_last_edit <= existing_last_edit {
                     return Ok(0);
                 }
             }
-    
+
             let mut updates = Vec::new();
             let mut param_values = Vec::new();
-    
+
             for (key, value) in map {
                 if key != "id" {
                     updates.push(format!("{} = ?", key));
                     param_values.push(json_to_param(value));
                 }
             }
-    
+
             param_values.push(json_to_param(id));
-    
+
             let update_str = updates.join(", ");
             let query = format!("UPDATE {} SET {} WHERE id = ?", table_name, update_str);
-    
+
             let mut stmt = conn.prepare(&query)?;
             let rows_affected = stmt.execute(rusqlite::params_from_iter(param_values))?;
             Ok(rows_affected)

@@ -1,6 +1,5 @@
 use crate::local_storage::contract::contract_tables::ContractTable;
 use crate::local_storage::core_local_storage::CoreLocalStorage;
-use chrono::{DateTime, Duration, Utc};
 use rusqlite::{Result, params};
 use serde_json::Value;
 use std::sync::Arc;
@@ -18,7 +17,7 @@ impl ContractLocalStorage {
         Ok(storage)
     }
 
-    pub fn get_contract_updates_by_date(&self, last_edit: DateTime<Utc>) -> Result<Vec<Value>> {
+    pub fn get_contract_updates_by_date(&self, last_edit: i64) -> Result<Vec<Value>> {
         let query = format!(
             "SELECT * FROM {} WHERE deleted = 0 AND lastEdit > ? ORDER BY lastEdit ASC",
             ContractTable::TABLE_NAME
@@ -27,14 +26,14 @@ impl ContractLocalStorage {
         let conn = self.core_storage.get_connection()?;
         let mut stmt = conn.prepare(&query)?;
         
-        let rows = stmt.query_map(params![last_edit.to_rfc3339()], |row| {
+        let rows = stmt.query_map(params![last_edit], |row| {
             let id: String = row.get(0)?;
             let done: i64 = row.get(1)?;
-            let last_edit: String = row.get(2)?;
+            let last_edit: i64 = row.get(2)?;
             let title: String = row.get(3)?;
             let additional_info: String = row.get(4)?;
-            let start_date: String = row.get(5)?;
-            let end_date: String = row.get(6)?;
+            let start_date: i64 = row.get(5)?;
+            let end_date: i64 = row.get(6)?;
             let available_quantity: f64 = row.get(7)?;
             let booked_quantity: f64 = row.get(8)?;
             let shipped_quantity: f64 = row.get(9)?;

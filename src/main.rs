@@ -45,6 +45,7 @@ struct Client {
     sender: UnboundedSender<Message>,
     db_name: String,
     user_id: String,
+    sync_completed: bool,
 }
 
 fn initialize_database(db_path: &str) -> Result<()> {
@@ -164,7 +165,7 @@ async fn handle_authentication_request(
                 "authenticated": 0,
                 "error": "Invalid tenant"
             },
-            "timestamp": chrono::Utc::now().to_rfc3339()
+            "timestamp": chrono::Utc::now().timestamp_millis()
         });
 
         send_message(
@@ -257,7 +258,7 @@ async fn handle_authentication_request(
                 "authenticated": 0,
                 "error": "User not found"
             },
-            "timestamp": chrono::Utc::now().to_rfc3339()
+            "timestamp": chrono::Utc::now().timestamp_millis()
         });
 
         send_message(
@@ -277,11 +278,11 @@ async fn handle_authentication_request(
         "data": {
             "id": user_data.get("id").unwrap_or(&json!("")).as_str(),
             "role": user_data.get("role").unwrap_or(&json!(0)),
-            "lastEdit": user_data.get("lastEdit").unwrap_or(&json!(chrono::Utc::now().to_rfc3339())),
+            "lastEdit": user_data.get("lastEdit").unwrap_or(&json!(chrono::Utc::now().timestamp_millis())),
             "name": user_data.get("name").unwrap_or(&json!("Unknown User")).as_str(),
             "authenticated": 1,
         },
-        "timestamp": chrono::Utc::now().to_rfc3339()
+        "timestamp": chrono::Utc::now().timestamp_millis()
     });
 
     send_message(
@@ -434,7 +435,7 @@ fn handle_user_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
 }
 
 async fn send_user_data(
-    last_sync: &str,
+    last_sync: i64,
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
@@ -447,14 +448,7 @@ async fn send_user_data(
         }
     };
 
-    let mut date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
-        Ok(date) => date.with_timezone(&chrono::Utc),
-        Err(e) => {
-            println!("Failed to parse last sync date: {:?}", e);
-            chrono::Utc::now() - chrono::Duration::days(365 * 30)
-        }
-    };
-
+    let mut date = last_sync;
     let mut should_continue = true;
 
     while should_continue {
@@ -473,30 +467,25 @@ async fn send_user_data(
                 let response = serde_json::json!({
                     "type": "user_update",
                     "data": user,
-                    "timestamp": chrono::Utc::now().to_rfc3339()
+                    "timestamp": chrono::Utc::now().timestamp_millis()
                 });
 
                 send_message(client_id.clone(), &response.to_string(), clients).await;
             }
 
             if let Some(newest_user) = users.last() {
-                if let Some(last_edit_str) = newest_user["lastEdit"].as_str() {
-                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str)
-                    {
-                        date = last_edit_date.with_timezone(&chrono::Utc);
-                        date = date + chrono::Duration::milliseconds(1);
-                    }
+                if let Some(last_edit) = newest_user["lastEdit"].as_i64() {
+                    date = last_edit + 1;
                 }
             }
         }
     }
 
-    println!("11");
     true
 }
 
 async fn send_sawmill_data(
-    last_sync: &str,
+    last_sync: i64,
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
@@ -509,14 +498,7 @@ async fn send_sawmill_data(
         }
     };
 
-    let mut date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
-        Ok(date) => date.with_timezone(&chrono::Utc),
-        Err(e) => {
-            println!("Failed to parse last sync date: {:?}", e);
-            chrono::Utc::now() - chrono::Duration::days(365 * 10)
-        }
-    };
-
+    let mut date = last_sync;
     let mut should_continue = true;
 
     while should_continue {
@@ -535,19 +517,15 @@ async fn send_sawmill_data(
                 let response = serde_json::json!({
                     "type": "sawmill_update",
                     "data": sawmill,
-                    "timestamp": chrono::Utc::now().to_rfc3339()
+                    "timestamp": chrono::Utc::now().timestamp_millis()
                 });
 
                 send_message(client_id.clone(), &response.to_string(), clients).await;
             }
 
             if let Some(newest_sawmill) = sawmills.last() {
-                if let Some(last_edit_str) = newest_sawmill["lastEdit"].as_str() {
-                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str)
-                    {
-                        date = last_edit_date.with_timezone(&chrono::Utc);
-                        date = date + chrono::Duration::milliseconds(1);
-                    }
+                if let Some(last_edit) = newest_sawmill["lastEdit"].as_i64() {
+                    date = last_edit + 1;
                 }
             }
         }
@@ -557,7 +535,7 @@ async fn send_sawmill_data(
 }
 
 async fn send_contract_data(
-    last_sync: &str,
+    last_sync: i64,
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
@@ -570,14 +548,7 @@ async fn send_contract_data(
         }
     };
 
-    let mut date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
-        Ok(date) => date.with_timezone(&chrono::Utc),
-        Err(e) => {
-            println!("Failed to parse last sync date: {:?}", e);
-            chrono::Utc::now() - chrono::Duration::days(365 * 10)
-        }
-    };
-
+    let mut date = last_sync;
     let mut should_continue = true;
 
     while should_continue {
@@ -596,19 +567,15 @@ async fn send_contract_data(
                 let response = serde_json::json!({
                     "type": "contract_update",
                     "data": contract,
-                    "timestamp": chrono::Utc::now().to_rfc3339()
+                    "timestamp": chrono::Utc::now().timestamp_millis()
                 });
 
                 send_message(client_id.clone(), &response.to_string(), clients).await;
             }
 
             if let Some(newest_contract) = contracts.last() {
-                if let Some(last_edit_str) = newest_contract["lastEdit"].as_str() {
-                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str)
-                    {
-                        date = last_edit_date.with_timezone(&chrono::Utc);
-                        date = date + chrono::Duration::milliseconds(1);
-                    }
+                if let Some(last_edit) = newest_contract["lastEdit"].as_i64() {
+                    date = last_edit + 1;
                 }
             }
         }
@@ -618,7 +585,7 @@ async fn send_contract_data(
 }
 
 async fn send_photo_data(
-    last_sync: &str,
+    last_sync: i64,
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
@@ -631,14 +598,7 @@ async fn send_photo_data(
         }
     };
 
-    let mut date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
-        Ok(date) => date.with_timezone(&chrono::Utc),
-        Err(e) => {
-            println!("Failed to parse last sync date: {:?}", e);
-            chrono::Utc::now() - chrono::Duration::days(365 * 10)
-        }
-    };
-
+    let mut date = last_sync;
     let mut should_continue = true;
 
     while should_continue {
@@ -653,30 +613,22 @@ async fn send_photo_data(
         if photos.is_empty() {
             should_continue = false;
         } else {
-            let mut newest_date = date;
-            if let Some(newest_photo) = photos.last() {
-                if let Some(last_edit_str) = newest_photo["lastEdit"].as_str() {
-                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str) {
-                        newest_date = last_edit_date.with_timezone(&chrono::Utc);
-                        newest_date = newest_date + chrono::Duration::milliseconds(1);
-                    }
-                }
-            }
-
-            let responses: Vec<String> = photos.iter().map(|photo| {
-                serde_json::json!({
-                    "type": "photo_update",
+            for photo in &photos {
+                let response = serde_json::json!({
+                    "type:": "photo_update",
                     "data": photo,
-                    "timestamp": chrono::Utc::now().to_rfc3339()
-                }).to_string()
-            }).collect();
-            
-            for response in responses {
-                send_message(client_id.clone(), &response, clients).await;
+                    "timestamp": chrono::Utc::now().timestamp_millis()
+                });
+
+                send_message(client_id.clone(), &response.to_string(), clients).await;
                 tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
             }
 
-            date = newest_date;
+            if let Some(newest_photo) = photos.last() {
+                if let Some(last_edit) = newest_photo["lastEdit"].as_i64() {
+                    date = last_edit + 1;
+                }
+            }
         }
     }
 
@@ -684,7 +636,7 @@ async fn send_photo_data(
 }
 
 async fn send_note_data(
-    last_sync: &str,
+    last_sync: i64,
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
@@ -697,14 +649,7 @@ async fn send_note_data(
         }
     };
 
-    let mut date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
-        Ok(date) => date.with_timezone(&chrono::Utc),
-        Err(e) => {
-            println!("Failed to parse last sync date: {:?}", e);
-            chrono::Utc::now() - chrono::Duration::days(365 * 10)
-        }
-    };
-
+    let mut date = last_sync;
     let mut should_continue = true;
 
     while should_continue {
@@ -723,19 +668,15 @@ async fn send_note_data(
                 let response = serde_json::json!({
                     "type": "note_update",
                     "data": note,
-                    "timestamp": chrono::Utc::now().to_rfc3339()
+                    "timestamp": chrono::Utc::now().timestamp_millis()
                 });
 
                 send_message(client_id.clone(), &response.to_string(), clients).await;
             }
 
             if let Some(newest_note) = notes.last() {
-                if let Some(last_edit_str) = newest_note["lastEdit"].as_str() {
-                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str)
-                    {
-                        date = last_edit_date.with_timezone(&chrono::Utc);
-                        date = date + chrono::Duration::milliseconds(1);
-                    }
+                if let Some(last_edit) = newest_note["lastEdit"].as_i64() {
+                    date = last_edit + 1;
                 }
             }
         }
@@ -745,7 +686,7 @@ async fn send_note_data(
 }
 
 async fn send_location_data(
-    last_sync: &str,
+    last_sync: i64,
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
@@ -758,14 +699,7 @@ async fn send_location_data(
         }
     };
 
-    let mut date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
-        Ok(date) => date.with_timezone(&chrono::Utc),
-        Err(e) => {
-            println!("Failed to parse last sync date: {:?}", e);
-            chrono::Utc::now() - chrono::Duration::days(365 * 10)
-        }
-    };
-
+    let mut date = last_sync;
     let mut should_continue = true;
 
     while should_continue {
@@ -784,19 +718,15 @@ async fn send_location_data(
                 let response = serde_json::json!({
                     "type": "location_update",
                     "data": location,
-                    "timestamp": chrono::Utc::now().to_rfc3339()
+                    "timestamp": chrono::Utc::now().timestamp_millis()
                 });
 
                 send_message(client_id.clone(), &response.to_string(), clients).await;
             }
 
             if let Some(newest_location) = locations.last() {
-                if let Some(last_edit_str) = newest_location["lastEdit"].as_str() {
-                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str)
-                    {
-                        date = last_edit_date.with_timezone(&chrono::Utc);
-                        date = date + chrono::Duration::milliseconds(1);
-                    }
+                if let Some(last_edit) = newest_location["lastEdit"].as_i64() {
+                    date = last_edit + 1;
                 }
             }
         }
@@ -806,7 +736,7 @@ async fn send_location_data(
 }
 
 async fn send_shipment_data(
-    last_sync: &str,
+    last_sync: i64,
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
@@ -819,14 +749,7 @@ async fn send_shipment_data(
         }
     };
 
-    let mut date = match chrono::DateTime::parse_from_rfc3339(last_sync) {
-        Ok(date) => date.with_timezone(&chrono::Utc),
-        Err(e) => {
-            println!("Failed to parse last sync date: {:?}", e);
-            chrono::Utc::now() - chrono::Duration::days(365 * 10)
-        }
-    };
-
+    let mut date = last_sync;
     let mut should_continue = true;
 
     while should_continue {
@@ -845,19 +768,15 @@ async fn send_shipment_data(
                 let response = serde_json::json!({
                     "type": "shipment_update",
                     "data": shipment,
-                    "timestamp": chrono::Utc::now().to_rfc3339()
+                    "timestamp": chrono::Utc::now().timestamp_millis()
                 });
 
                 send_message(client_id.clone(), &response.to_string(), clients).await;
             }
 
             if let Some(newest_shipment) = shipments.last() {
-                if let Some(last_edit_str) = newest_shipment["lastEdit"].as_str() {
-                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str)
-                    {
-                        date = last_edit_date.with_timezone(&chrono::Utc);
-                        date = date + chrono::Duration::milliseconds(1);
-                    }
+                if let Some(last_edit) = newest_shipment["lastEdit"].as_i64() {
+                    date = last_edit + 1;
                 }
             }
         }
@@ -886,31 +805,44 @@ async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients)
     let last_user_sync = data
         .get("user_update")
         .and_then(|v| v.as_str())
-        .unwrap_or("");
+        .and_then(|s| s.parse::<i64>().ok())
+        .unwrap_or(0);
+
     let last_sawmill_sync = data
         .get("sawmill_update")
         .and_then(|v| v.as_str())
-        .unwrap_or("");
+        .and_then(|s| s.parse::<i64>().ok())
+        .unwrap_or(0);
+
     let last_contract_sync = data
         .get("contract_update")
         .and_then(|v| v.as_str())
-        .unwrap_or("");
+        .and_then(|s| s.parse::<i64>().ok())
+        .unwrap_or(0);
+
     let last_note_sync = data
         .get("note_update")
         .and_then(|v| v.as_str())
-        .unwrap_or("");
+        .and_then(|s| s.parse::<i64>().ok())
+        .unwrap_or(0);
+
     let last_location_sync = data
         .get("location_update")
         .and_then(|v| v.as_str())
-        .unwrap_or("");
+        .and_then(|s| s.parse::<i64>().ok())
+        .unwrap_or(0);
+
     let last_shipment_sync = data
         .get("shipment_update")
         .and_then(|v| v.as_str())
-        .unwrap_or("");
+        .and_then(|s| s.parse::<i64>().ok())
+        .unwrap_or(0);
+
     let last_photo_sync = data
         .get("photo_update")
         .and_then(|v| v.as_str())
-        .unwrap_or("");
+        .and_then(|s| s.parse::<i64>().ok())
+        .unwrap_or(0);
 
     let user_result = send_user_data(
         last_user_sync,
@@ -998,7 +930,7 @@ async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients)
 
     let completion_message = serde_json::json!({
         "type": "sync_complete",
-        "timestamp": chrono::Utc::now().to_rfc3339()
+        "timestamp": chrono::Utc::now().timestamp_millis()
     });
 
     send_message(client_id.clone(), &completion_message.to_string(), clients).await;
@@ -1026,7 +958,7 @@ async fn send_message(client_id: String, msg: &str, clients: &Clients) {
 async fn send_pong(client_id: String, clients: &Clients) {
     let response = json!({
         "type": "pong",
-        "timestamp": chrono::Utc::now().to_rfc3339()
+        "timestamp": chrono::Utc::now().timestamp_millis()
     });
     send_message(client_id, &response.to_string(), clients).await;
 }
@@ -1035,7 +967,7 @@ async fn broadcast_message(client_id: String, msg: &str, clients: &Clients) {
     match clients.lock() {
         Ok(clients_lock) => {
             for (id, client) in clients_lock.iter() {
-                if id != &client_id {
+                if id != &client_id && !client.db_name.is_empty() && client.sync_completed {
                     if let Err(e) = client.sender.send(Message::text(msg)) {
                         println!("Error sending message to client {}: {:?}", id, e);
                     }
@@ -1058,7 +990,6 @@ async fn authenticate_client(
         match result {
             Ok(msg) => {
                 if let Some(text) = msg.to_str().ok() {
-                    println!("{}", text);
                     if let Ok(json_msg) = serde_json::from_str::<Value>(text) {
                         if json_msg.get("type").and_then(|v| v.as_str())
                             == Some("authentication_request")
@@ -1091,7 +1022,6 @@ async fn handle_authenticated_client(
             Ok(msg) => {
                 if let Some(text) = msg.to_str().ok() {
                     if let Ok(json_msg) = serde_json::from_str::<Value>(text) {
-                        println!("{}", text);
                         let msg_type = json_msg
                             .get("type")
                             .and_then(|v| v.as_str())
@@ -1099,12 +1029,34 @@ async fn handle_authenticated_client(
 
                         println!("Received message from client {}: {}", client_id, msg_type);
 
+                        if msg_type != "photo_update" {
+                            println!("{}", text);
+                        } else {
+                            println!("photo_update");
+                        }
+
                         let data = json_msg.get("data").cloned().unwrap_or(json!({}));
 
                         if msg_type == "ping" {
                             send_pong(client_id.clone(), &clients).await;
                         } else if msg_type == "sync_request" {
-                            handle_sync_request(&data, client_id.clone(), &clients).await;
+                            if handle_sync_request(&data, client_id.clone(), &clients).await {
+                                println!("Sync to client complete");
+                                match clients.lock() {
+                                    Ok(mut clients_lock) => {
+                                        if let Some(client) = clients_lock.get_mut(&client_id) {
+                                            client.sync_completed = true;
+                                            println!("Client {} marked as fully synced", client_id);
+                                        }
+                                    }
+                                    Err(e) => {
+                                        println!(
+                                            "Failed to lock clients to update sync status: {:?}",
+                                            e
+                                        );
+                                    }
+                                }
+                            }
                         } else if msg_type == "sync_complete" {
                             println!("Sync from client complete");
                         } else {
@@ -1145,6 +1097,7 @@ async fn handle_connection(ws: WebSocket, clients: Clients, db_pools: DbPoolMap)
                     sender: tx.clone(),
                     db_name: "".to_string(),
                     user_id: "".to_string(),
+                    sync_completed: false,
                 },
             );
         }

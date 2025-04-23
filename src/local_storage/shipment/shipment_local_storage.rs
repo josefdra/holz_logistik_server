@@ -1,6 +1,5 @@
 use crate::local_storage::core_local_storage::CoreLocalStorage;
 use crate::local_storage::shipment::shipment_tables::ShipmentTable;
-use chrono::{DateTime, Duration, Utc};
 use rusqlite::{Result, params};
 use serde_json::Value;
 use std::sync::Arc;
@@ -18,7 +17,7 @@ impl ShipmentLocalStorage {
         Ok(storage)
     }
 
-    pub fn get_shipments_by_date(&self, last_edit: DateTime<Utc>) -> Result<Vec<Value>> {
+    pub fn get_shipments_by_date(&self, last_edit: i64) -> Result<Vec<Value>> {
         let query = format!(
             "SELECT * FROM {} WHERE deleted = 0 AND lastEdit > ? ORDER BY lastEdit ASC",
             ShipmentTable::TABLE_NAME
@@ -27,9 +26,9 @@ impl ShipmentLocalStorage {
         let conn = self.core_storage.get_connection()?;
         let mut stmt = conn.prepare(&query)?;
         
-        let rows = stmt.query_map(params![last_edit.to_rfc3339()], |row| {
+        let rows = stmt.query_map(params![last_edit], |row| {
             let id: String = row.get(0)?;
-            let last_edit: String = row.get(1)?;
+            let last_edit: i64 = row.get(1)?;
             let quantity: f64 = row.get(2)?;
             let oversize_quantity: f64 = row.get(3)?;
             let piece_count: i32 = row.get(4)?;
