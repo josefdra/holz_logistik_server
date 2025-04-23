@@ -37,8 +37,7 @@ impl UserLocalStorage {
         let conn = self.core_storage.get_connection()?;
         let mut stmt = conn.prepare(&query)?;
         
-        let slightly_newer = last_edit + Duration::milliseconds(1);
-        let rows = stmt.query_map(params![slightly_newer.to_rfc3339()], |row| {
+        let rows = stmt.query_map(params![last_edit.to_rfc3339()], |row| {
             let id: String = row.get(0)?;
             let last_edit: String = row.get(1)?;
             let role: i32 = row.get(2)?;

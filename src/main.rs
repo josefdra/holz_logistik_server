@@ -469,13 +469,15 @@ async fn send_user_data(
         if users.is_empty() {
             should_continue = false;
         } else {
-            let response = serde_json::json!({
-                "type": "user_sync",
-                "data": users,
-                "timestamp": chrono::Utc::now().to_rfc3339()
-            });
+            for user in &users {
+                let response = serde_json::json!({
+                    "type": "user_update",
+                    "data": user,
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                });
 
-            send_message(client_id.clone(), &response.to_string(), clients).await;
+                send_message(client_id.clone(), &response.to_string(), clients).await;
+            }
 
             if let Some(newest_user) = users.last() {
                 if let Some(last_edit_str) = newest_user["lastEdit"].as_str() {
@@ -489,6 +491,7 @@ async fn send_user_data(
         }
     }
 
+    println!("11");
     true
 }
 
@@ -653,26 +656,21 @@ async fn send_photo_data(
             let mut newest_date = date;
             if let Some(newest_photo) = photos.last() {
                 if let Some(last_edit_str) = newest_photo["lastEdit"].as_str() {
-                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str)
-                    {
+                    if let Ok(last_edit_date) = chrono::DateTime::parse_from_rfc3339(last_edit_str) {
                         newest_date = last_edit_date.with_timezone(&chrono::Utc);
                         newest_date = newest_date + chrono::Duration::milliseconds(1);
                     }
                 }
             }
 
-            let responses: Vec<String> = photos
-                .iter()
-                .map(|photo| {
-                    serde_json::json!({
-                        "type": "photo_update",
-                        "data": photo,
-                        "timestamp": chrono::Utc::now().to_rfc3339()
-                    })
-                    .to_string()
-                })
-                .collect();
-
+            let responses: Vec<String> = photos.iter().map(|photo| {
+                serde_json::json!({
+                    "type": "photo_update",
+                    "data": photo,
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                }).to_string()
+            }).collect();
+            
             for response in responses {
                 send_message(client_id.clone(), &response, clients).await;
                 tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
