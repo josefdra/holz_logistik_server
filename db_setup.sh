@@ -143,8 +143,8 @@ if [ "$JOSEF_EXISTS" -eq "0" ]; then
     fi
 
     sqlite3 "$DB_PATH" << EOL
-    INSERT INTO users (id, name, role, lastEdit) 
-    VALUES ('$UUID', 'josef', 2, $UTC_TIMESTAMP);
+    INSERT INTO users (id, name, role, lastEdit, arrivalAtServer) 
+    VALUES ('$UUID', 'josef', 2, $UTC_TIMESTAMP, $UTC_TIMESTAMP);
 EOL
     echo "Created new josef user with ID: $UUID"
     USER_ID=$UUID
