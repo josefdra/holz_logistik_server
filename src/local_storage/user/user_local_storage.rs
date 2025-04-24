@@ -1,5 +1,4 @@
 use crate::local_storage::core_local_storage::CoreLocalStorage;
-use crate::local_storage::user::user_tables::UserTable;
 use rusqlite::{Result, params};
 use serde_json::Value;
 use std::sync::Arc;
@@ -18,7 +17,7 @@ impl UserLocalStorage {
     }
 
     pub fn get_user_by_id(&self, id: &str) -> Result<Option<Value>> {
-        let user_json = self.core_storage.get_by_id(UserTable::TABLE_NAME, id)?;
+        let user_json = self.core_storage.get_by_id("users", id)?;
 
         if user_json.is_empty() {
             return Ok(None);
@@ -29,8 +28,7 @@ impl UserLocalStorage {
 
     pub fn get_user_updates_by_date(&self, last_edit: i64) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT * FROM {} WHERE deleted = 0 AND lastEdit > ? ORDER BY lastEdit ASC",
-            UserTable::TABLE_NAME
+            "SELECT * FROM users WHERE deleted = 0 AND lastEdit > ? ORDER BY lastEdit ASC",
         );
 
         let conn = self.core_storage.get_connection()?;
@@ -66,7 +64,7 @@ impl UserLocalStorage {
     pub fn save_user(&self, user_data: &Value) -> Result<i64> {
         let result = self
             .core_storage
-            .insert_or_update(UserTable::TABLE_NAME, user_data)?;
+            .insert_or_update("users", user_data)?;
 
         Ok(result)
     }

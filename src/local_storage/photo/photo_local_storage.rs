@@ -1,5 +1,4 @@
 use crate::local_storage::core_local_storage::CoreLocalStorage;
-use crate::local_storage::photo::photo_tables::PhotoTable;
 use rusqlite::{Result, params};
 use serde_json::Value;
 use std::sync::Arc;
@@ -14,16 +13,12 @@ impl PhotoLocalStorage {
             core_storage: core_storage.clone(),
         };
 
-        let conn = core_storage.get_connection()?;
-        conn.execute(&PhotoTable::create_table(), [])?;
-
         Ok(storage)
     }
 
     pub fn get_photo_updates_by_date(&self, last_edit: i64) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT * FROM {} WHERE deleted = 0 AND lastEdit > ? ORDER BY lastEdit ASC",
-            PhotoTable::TABLE_NAME,
+            "SELECT * FROM photos WHERE deleted = 0 AND lastEdit > ? ORDER BY lastEdit ASC",
         );
 
         let conn = self.core_storage.get_connection()?;
@@ -58,7 +53,7 @@ impl PhotoLocalStorage {
 
     pub fn save_photo(&self, photo_data: &Value) -> Result<i64> {
         let id = photo_data["id"].as_str().unwrap_or_default();
-        let last_edit = photo_data["lastEdit"].as_str().unwrap_or_default();
+        let last_edit = photo_data["lastEdit"].as_i64().unwrap_or(0);
         let photo_file = match &photo_data["photoFile"] {
             Value::Array(arr) => {
                 let bytes: Vec<u8> = arr.iter()
@@ -72,12 +67,7 @@ impl PhotoLocalStorage {
         
         let conn = self.core_storage.get_connection()?;
         let query = format!(
-            "INSERT OR REPLACE INTO {} ({}, {}, {}, {}) VALUES (?, ?, ?, ?)",
-            PhotoTable::TABLE_NAME,
-            PhotoTable::COLUMN_ID,
-            PhotoTable::COLUMN_LAST_EDIT,
-            PhotoTable::COLUMN_PHOTO,
-            PhotoTable::COLUMN_LOCATION_ID
+            "INSERT OR REPLACE INTO photos (id, lastEdit, photoFile, locationId) VALUES (?, ?, ?, ?)",
         );
 
         let result = conn.execute(

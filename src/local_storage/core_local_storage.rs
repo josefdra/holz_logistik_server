@@ -28,7 +28,7 @@ impl CoreLocalStorage {
 
     pub fn get_by_id(&self, table_name: &str, id: &str) -> Result<Vec<serde_json::Value>> {
         let conn = self.get_connection()?;
-        let query = format!("SELECT * FROM {} WHERE id = ?", table_name);
+        let query = format!("SELECT * FROM {} WHERE deleted = 0 AND id = ?", table_name);
 
         let mut stmt = conn.prepare(&query)?;
 
@@ -159,7 +159,7 @@ impl CoreLocalStorage {
 
             if !has_last_edit {
             } else {
-                let query = format!("SELECT lastEdit FROM {} WHERE id = ?", table_name);
+                let query = format!("SELECT lastEdit FROM {} WHERE deleted = 0 AND id = ?", table_name);
                 let mut stmt = conn.prepare(&query)?;
 
                 let existing_last_edit: i64 =
@@ -187,7 +187,7 @@ impl CoreLocalStorage {
             param_values.push(json_to_param(id));
 
             let update_str = updates.join(", ");
-            let query = format!("UPDATE {} SET {} WHERE id = ?", table_name, update_str);
+            let query = format!("UPDATE {} SET {} WHERE deleted = 0 AND id = ?", table_name, update_str);
 
             let mut stmt = conn.prepare(&query)?;
             let rows_affected = stmt.execute(rusqlite::params_from_iter(param_values))?;
@@ -234,6 +234,45 @@ impl CoreLocalStorage {
 
         let result = conn.execute(&query, params![value]);
         result
+    }
+
+    pub fn mark_as_deleted(&self, table_name: &str, id: &str) -> Result<usize> {
+        let conn = self.get_connection()?;
+        
+        let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", table_name))?;
+        let columns = stmt.query_map([], |row| Ok(row.get::<_, String>(1)?))?;
+        let mut has_deleted_column = false;
+        let mut has_last_edit_column = false;
+        
+        for column_result in columns {
+            let column_name = column_result?;
+            if column_name == "deleted" {
+                has_deleted_column = true;
+            } else if column_name == "lastEdit" {
+                has_last_edit_column = true;
+            }
+        }
+        
+        if !has_deleted_column {
+            return Err(rusqlite::Error::InvalidParameterName(
+                format!("Table '{}' does not have a 'deleted' column", table_name)
+            ));
+        }
+        
+        let current_time = chrono::Utc::now().timestamp_millis();
+        let query = if has_last_edit_column {
+            format!("UPDATE {} SET deleted = 1, lastEdit = ? WHERE id = ?", table_name)
+        } else {
+            format!("UPDATE {} SET deleted = 1 WHERE id = ?", table_name)
+        };
+        
+        let result = if has_last_edit_column {
+            conn.execute(&query, params![current_time, id])?
+        } else {
+            conn.execute(&query, params![id])?
+        };
+        
+        Ok(result)
     }
 }
 

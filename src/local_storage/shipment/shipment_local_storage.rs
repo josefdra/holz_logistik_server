@@ -1,5 +1,4 @@
 use crate::local_storage::core_local_storage::CoreLocalStorage;
-use crate::local_storage::shipment::shipment_tables::ShipmentTable;
 use rusqlite::{Result, params};
 use serde_json::Value;
 use std::sync::Arc;
@@ -19,8 +18,7 @@ impl ShipmentLocalStorage {
 
     pub fn get_shipments_by_date(&self, last_edit: i64) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT * FROM {} WHERE deleted = 0 AND lastEdit > ? ORDER BY lastEdit ASC",
-            ShipmentTable::TABLE_NAME
+            "SELECT * FROM shipments WHERE deleted = 0 AND lastEdit > ? ORDER BY lastEdit ASC",
         );
 
         let conn = self.core_storage.get_connection()?;
@@ -66,7 +64,7 @@ impl ShipmentLocalStorage {
     pub fn save_shipment(&self, shipment_data: &Value) -> Result<i64> {
         let result = self
             .core_storage
-            .insert_or_update(ShipmentTable::TABLE_NAME, shipment_data)?;
+            .insert_or_update("shipments", shipment_data)?;
 
         Ok(result)
     }

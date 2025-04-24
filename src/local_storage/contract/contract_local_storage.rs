@@ -1,4 +1,3 @@
-use crate::local_storage::contract::contract_tables::ContractTable;
 use crate::local_storage::core_local_storage::CoreLocalStorage;
 use rusqlite::{Result, params};
 use serde_json::Value;
@@ -19,8 +18,7 @@ impl ContractLocalStorage {
 
     pub fn get_contract_updates_by_date(&self, last_edit: i64) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT * FROM {} WHERE deleted = 0 AND lastEdit > ? ORDER BY lastEdit ASC",
-            ContractTable::TABLE_NAME
+            "SELECT * FROM contracts WHERE deleted = 0 AND lastEdit > ? ORDER BY lastEdit ASC",
         );
 
         let conn = self.core_storage.get_connection()?;
@@ -68,7 +66,7 @@ impl ContractLocalStorage {
     pub fn save_contract(&self, contract_data: &Value) -> Result<i64> {
         let result = self
             .core_storage
-            .insert_or_update(ContractTable::TABLE_NAME, contract_data)?;
+            .insert_or_update("contracts", contract_data)?;
 
         Ok(result)
     }

@@ -1,5 +1,4 @@
 use crate::local_storage::core_local_storage::CoreLocalStorage;
-use crate::local_storage::sawmill::sawmill_tables::SawmillTable;
 use rusqlite::{Result, params};
 use serde_json::Value;
 use std::sync::Arc;
@@ -19,8 +18,7 @@ impl SawmillLocalStorage {
 
     pub fn get_sawmill_updates_by_date(&self, last_edit: i64) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT * FROM {} WHERE deleted = 0 AND lastEdit > ? ORDER BY lastEdit ASC",
-            SawmillTable::TABLE_NAME
+            "SELECT * FROM sawmills WHERE deleted = 0 AND lastEdit > ? ORDER BY lastEdit ASC",
         );
 
         let conn = self.core_storage.get_connection()?;
@@ -56,7 +54,7 @@ impl SawmillLocalStorage {
     pub fn save_sawmill(&self, sawmill_data: &Value) -> Result<i64> {
         let result = self
             .core_storage
-            .insert_or_update(SawmillTable::TABLE_NAME, sawmill_data)?;
+            .insert_or_update("sawmills", sawmill_data)?;
 
         Ok(result)
     }

@@ -1,5 +1,4 @@
 use crate::local_storage::core_local_storage::CoreLocalStorage;
-use crate::local_storage::note::note_tables::NoteTable;
 use rusqlite::{Result, params};
 use serde_json::Value;
 use std::sync::Arc;
@@ -19,8 +18,7 @@ impl NoteLocalStorage {
 
     pub fn get_note_updates_by_date(&self, last_edit: i64) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT * FROM {} WHERE deleted = 0 AND lastEdit > ? ORDER BY lastEdit ASC",
-            NoteTable::TABLE_NAME
+            "SELECT * FROM notes WHERE deleted = 0 AND lastEdit > ? ORDER BY lastEdit ASC",
         );
 
         let conn = self.core_storage.get_connection()?;
@@ -56,7 +54,7 @@ impl NoteLocalStorage {
     pub fn save_note(&self, note_data: &Value) -> Result<i64> {
         let result = self
             .core_storage
-            .insert_or_update(NoteTable::TABLE_NAME, note_data)?;
+            .insert_or_update("notes", note_data)?;
 
         Ok(result)
     }
