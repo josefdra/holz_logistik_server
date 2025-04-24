@@ -18,7 +18,7 @@ impl PhotoLocalStorage {
 
     pub fn get_photo_updates_by_date(&self, last_edit: i64) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT * FROM photos WHERE deleted = 0 AND lastEdit > ? ORDER BY lastEdit ASC",
+            "SELECT * FROM photos WHERE deleted = 0 AND arrivalAtServer > ? ORDER BY lastEdit ASC",
         );
 
         let conn = self.core_storage.get_connection()?;
@@ -64,10 +64,11 @@ impl PhotoLocalStorage {
             _ => Vec::new(),
         };
         let location_id = photo_data["locationId"].as_str().unwrap_or_default();
+        let arrival_at_server = chrono::Utc::now().timestamp_millis();
         
         let conn = self.core_storage.get_connection()?;
         let query = format!(
-            "INSERT OR REPLACE INTO photos (id, lastEdit, photoFile, locationId) VALUES (?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO photos (id, lastEdit, photoFile, locationId, arrivalAtServer) VALUES (?, ?, ?, ?, ?)",
         );
 
         let result = conn.execute(
@@ -76,7 +77,8 @@ impl PhotoLocalStorage {
                 id,
                 last_edit,
                 photo_file,
-                location_id
+                location_id,
+                arrival_at_server
             ],
         )?;
 

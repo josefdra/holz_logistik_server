@@ -528,12 +528,12 @@ async fn send_user_data(
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
-) -> bool {
+) -> i64 {
     let user_storage = match UserLocalStorage::new(core_storage) {
         Ok(storage) => storage,
         Err(e) => {
             println!("Failed to create user storage: {:?}", e);
-            return false;
+            return last_sync;
         }
     };
 
@@ -545,7 +545,7 @@ async fn send_user_data(
             Ok(users) => users,
             Err(e) => {
                 println!("Failed to get user updates: {:?}", e);
-                return false;
+                return last_sync;
             }
         };
 
@@ -570,7 +570,17 @@ async fn send_user_data(
         }
     }
 
-    true
+    let completion_message = serde_json::json!({
+        "type": "user_updated",
+        "data": serde_json::json!({
+            "new_sync_date": date,
+        }),
+        "timestamp": chrono::Utc::now().timestamp_millis()
+    });
+
+    send_message(client_id.clone(), &completion_message.to_string(), clients).await;
+
+    date
 }
 
 async fn send_sawmill_data(
@@ -578,12 +588,12 @@ async fn send_sawmill_data(
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
-) -> bool {
+) -> i64 {
     let sawmill_storage = match SawmillLocalStorage::new(core_storage) {
         Ok(storage) => storage,
         Err(e) => {
             println!("Failed to create sawmill storage: {:?}", e);
-            return false;
+            return last_sync;
         }
     };
 
@@ -595,7 +605,7 @@ async fn send_sawmill_data(
             Ok(sawmills) => sawmills,
             Err(e) => {
                 println!("Failed to get sawmill updates: {:?}", e);
-                return false;
+                return last_sync;
             }
         };
 
@@ -620,7 +630,7 @@ async fn send_sawmill_data(
         }
     }
 
-    true
+    date
 }
 
 async fn send_contract_data(
@@ -628,12 +638,12 @@ async fn send_contract_data(
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
-) -> bool {
+) -> i64 {
     let contract_storage = match ContractLocalStorage::new(core_storage) {
         Ok(storage) => storage,
         Err(e) => {
             println!("Failed to create contract storage: {:?}", e);
-            return false;
+            return last_sync;
         }
     };
 
@@ -645,7 +655,7 @@ async fn send_contract_data(
             Ok(contracts) => contracts,
             Err(e) => {
                 println!("Failed to get contract updates: {:?}", e);
-                return false;
+                return last_sync;
             }
         };
 
@@ -670,7 +680,7 @@ async fn send_contract_data(
         }
     }
 
-    true
+    date
 }
 
 async fn send_photo_data(
@@ -678,12 +688,12 @@ async fn send_photo_data(
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
-) -> bool {
+) -> i64 {
     let photo_storage = match PhotoLocalStorage::new(core_storage) {
         Ok(storage) => storage,
         Err(e) => {
             println!("Failed to create photo storage: {:?}", e);
-            return false;
+            return last_sync;
         }
     };
 
@@ -695,7 +705,7 @@ async fn send_photo_data(
             Ok(photos) => photos,
             Err(e) => {
                 println!("Failed to get photo updates: {:?}", e);
-                return false;
+                return last_sync;
             }
         };
 
@@ -721,7 +731,7 @@ async fn send_photo_data(
         }
     }
 
-    true
+    date
 }
 
 async fn send_note_data(
@@ -729,12 +739,12 @@ async fn send_note_data(
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
-) -> bool {
+) -> i64 {
     let note_storage = match NoteLocalStorage::new(core_storage) {
         Ok(storage) => storage,
         Err(e) => {
             println!("Failed to create note storage: {:?}", e);
-            return false;
+            return last_sync;
         }
     };
 
@@ -746,7 +756,7 @@ async fn send_note_data(
             Ok(notes) => notes,
             Err(e) => {
                 println!("Failed to get note updates: {:?}", e);
-                return false;
+                return last_sync;
             }
         };
 
@@ -771,7 +781,7 @@ async fn send_note_data(
         }
     }
 
-    true
+    date
 }
 
 async fn send_location_data(
@@ -779,12 +789,12 @@ async fn send_location_data(
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
-) -> bool {
+) -> i64 {
     let location_storage = match LocationLocalStorage::new(core_storage) {
         Ok(storage) => storage,
         Err(e) => {
             println!("Failed to create location storage: {:?}", e);
-            return false;
+            return last_sync;
         }
     };
 
@@ -796,7 +806,7 @@ async fn send_location_data(
             Ok(locations) => locations,
             Err(e) => {
                 println!("Failed to get location updates: {:?}", e);
-                return false;
+                return last_sync;
             }
         };
 
@@ -821,7 +831,7 @@ async fn send_location_data(
         }
     }
 
-    true
+    date
 }
 
 async fn send_shipment_data(
@@ -829,12 +839,12 @@ async fn send_shipment_data(
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
     clients: &Clients,
-) -> bool {
+) -> i64 {
     let shipment_storage = match ShipmentLocalStorage::new(core_storage) {
         Ok(storage) => storage,
         Err(e) => {
             println!("Failed to create shipment storage: {:?}", e);
-            return false;
+            return last_sync;
         }
     };
 
@@ -846,7 +856,7 @@ async fn send_shipment_data(
             Ok(shipments) => shipments,
             Err(e) => {
                 println!("Failed to get shipment updates: {:?}", e);
-                return false;
+                return last_sync;
             }
         };
 
@@ -871,7 +881,7 @@ async fn send_shipment_data(
         }
     }
 
-    true
+    date
 }
 
 async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients) -> bool {
@@ -933,96 +943,61 @@ async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients)
         .and_then(|s| s.parse::<i64>().ok())
         .unwrap_or(0);
 
-    let user_result = send_user_data(
+    send_user_data(
         last_user_sync,
         client_id.clone(),
         core_storage.clone(),
         clients,
     )
     .await;
-    println!(
-        "User data sync: {}",
-        if user_result { "Success" } else { "Failed" }
-    );
 
-    let sawmill_result = send_sawmill_data(
+    send_sawmill_data(
         last_sawmill_sync,
         client_id.clone(),
         core_storage.clone(),
         clients,
     )
     .await;
-    println!(
-        "Sawmill data sync: {}",
-        if sawmill_result { "Success" } else { "Failed" }
-    );
 
-    let contract_result = send_contract_data(
+    send_contract_data(
         last_contract_sync,
         client_id.clone(),
         core_storage.clone(),
         clients,
     )
     .await;
-    println!(
-        "Contract data sync: {}",
-        if contract_result { "Success" } else { "Failed" }
-    );
 
-    let location_result = send_location_data(
+    send_location_data(
         last_location_sync,
         client_id.clone(),
         core_storage.clone(),
         clients,
     )
     .await;
-    println!(
-        "Location data sync: {}",
-        if location_result { "Success" } else { "Failed" }
-    );
 
-    let shipment_result = send_shipment_data(
+    send_shipment_data(
         last_shipment_sync,
         client_id.clone(),
         core_storage.clone(),
         clients,
     )
     .await;
-    println!(
-        "Shipment data sync: {}",
-        if shipment_result { "Success" } else { "Failed" }
-    );
 
-    let note_result = send_note_data(
+    send_note_data(
         last_note_sync,
         client_id.clone(),
         core_storage.clone(),
         clients,
     )
     .await;
-    println!(
-        "Note data sync: {}",
-        if note_result { "Success" } else { "Failed" }
-    );
 
-    let photo_result = send_photo_data(
+    send_photo_data(
         last_photo_sync,
         client_id.clone(),
         core_storage.clone(),
         clients,
     )
     .await;
-    println!(
-        "Photo data sync: {}",
-        if photo_result { "Success" } else { "Failed" }
-    );
-
-    let completion_message = serde_json::json!({
-        "type": "sync_complete",
-        "timestamp": chrono::Utc::now().timestamp_millis()
-    });
-
-    send_message(client_id.clone(), &completion_message.to_string(), clients).await;
 
     true
 }

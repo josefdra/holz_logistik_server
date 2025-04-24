@@ -45,7 +45,7 @@ impl LocationLocalStorage {
     pub fn get_location_updates_by_date(&self, last_edit: i64) -> Result<Vec<Value>> {
         let location_ids = {
             let query = format!(
-                "SELECT id FROM locations WHERE deleted = 0 AND lastEdit > ? ORDER BY lastEdit ASC",
+                "SELECT id FROM locations WHERE deleted = 0 AND arrivalAtServer > ? ORDER BY lastEdit ASC",
             );
 
             let conn = self.core_storage.get_connection()?;
@@ -157,6 +157,7 @@ impl LocationLocalStorage {
         if let serde_json::Value::Object(ref mut map) = location_for_save {
             map.remove("sawmillIds");
             map.remove("oversizeSawmillIds");
+            map.insert("arrivalAtServer".to_string(), chrono::Utc::now().timestamp_millis().into());
         }
 
         self.core_storage

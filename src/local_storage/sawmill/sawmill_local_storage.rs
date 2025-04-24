@@ -18,7 +18,7 @@ impl SawmillLocalStorage {
 
     pub fn get_sawmill_updates_by_date(&self, last_edit: i64) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT * FROM sawmills WHERE deleted = 0 AND lastEdit > ? ORDER BY lastEdit ASC",
+            "SELECT * FROM sawmills WHERE deleted = 0 AND arrivalAtServer > ? ORDER BY lastEdit ASC",
         );
 
         let conn = self.core_storage.get_connection()?;
@@ -52,9 +52,13 @@ impl SawmillLocalStorage {
     }
 
     pub fn save_sawmill(&self, sawmill_data: &Value) -> Result<i64> {
-        let result = self
-            .core_storage
-            .insert_or_update("sawmills", sawmill_data)?;
+        let mut sawmill_for_save = sawmill_data.clone();
+        if let serde_json::Value::Object(ref mut map) = sawmill_for_save {
+            map.insert("arrivalAtServer".to_string(), chrono::Utc::now().timestamp_millis().into());
+        }
+
+        let result = self.core_storage
+            .insert_or_update("sawmills", &sawmill_for_save)?;
 
         Ok(result)
     }

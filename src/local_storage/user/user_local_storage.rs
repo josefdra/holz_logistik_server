@@ -28,7 +28,7 @@ impl UserLocalStorage {
 
     pub fn get_user_updates_by_date(&self, last_edit: i64) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT * FROM users WHERE deleted = 0 AND lastEdit > ? ORDER BY lastEdit ASC",
+            "SELECT * FROM users WHERE deleted = 0 AND arrivalAtServer > ? ORDER BY lastEdit ASC",
         );
 
         let conn = self.core_storage.get_connection()?;
@@ -62,9 +62,13 @@ impl UserLocalStorage {
     }
 
     pub fn save_user(&self, user_data: &Value) -> Result<i64> {
-        let result = self
-            .core_storage
-            .insert_or_update("users", user_data)?;
+        let mut user_for_save = user_data.clone();
+        if let serde_json::Value::Object(ref mut map) = user_for_save {
+            map.insert("arrivalAtServer".to_string(), chrono::Utc::now().timestamp_millis().into());
+        }
+
+        let result = self.core_storage
+            .insert_or_update("shipments", &user_for_save)?;
 
         Ok(result)
     }

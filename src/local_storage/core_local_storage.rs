@@ -261,15 +261,15 @@ impl CoreLocalStorage {
         
         let current_time = chrono::Utc::now().timestamp_millis();
         let query = if has_last_edit_column {
-            format!("UPDATE {} SET deleted = 1, lastEdit = ? WHERE id = ?", table_name)
+            format!("UPDATE {} SET deleted = 1, lastEdit = ?, arrivalAtServer = ? WHERE id = ?", table_name)
         } else {
-            format!("UPDATE {} SET deleted = 1 WHERE id = ?", table_name)
+            format!("UPDATE {} SET deleted = 1, arrivalAtServer = ? WHERE id = ?", table_name)
         };
         
         let result = if has_last_edit_column {
-            conn.execute(&query, params![current_time, id])?
+            conn.execute(&query, params![current_time, current_time, id])?
         } else {
-            conn.execute(&query, params![id])?
+            conn.execute(&query, params![current_time, id])?
         };
         
         Ok(result)
