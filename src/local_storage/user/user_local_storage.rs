@@ -39,12 +39,14 @@ impl UserLocalStorage {
             let last_edit: i64 = row.get(1)?;
             let role: i32 = row.get(2)?;
             let name: String = row.get(3)?;
+            let arrival_at_server: i64 = row.get(4)?;
 
             let user_json = serde_json::json!({
                 "id": id,
                 "lastEdit": last_edit,
                 "role": role,
                 "name": name,
+                "arrivalAtServer": arrival_at_server
             });
 
             Ok(user_json)
@@ -68,7 +70,7 @@ impl UserLocalStorage {
         }
 
         let result = self.core_storage
-            .insert_or_update("shipments", &user_for_save)?;
+            .insert_or_update("users", &user_for_save)?;
 
         Ok(result)
     }

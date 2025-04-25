@@ -28,11 +28,13 @@ impl SawmillLocalStorage {
             let id: String = row.get(0)?;
             let last_edit: i64 = row.get(1)?;
             let name: String = row.get(2)?;
+            let arrival_at_server: i64 = row.get(3)?;
 
             let sawmill_json = serde_json::json!({
                 "id": id,
                 "lastEdit": last_edit,
                 "name": name,
+                "arrivalAtServer": arrival_at_server
             });
 
             Ok(sawmill_json)

@@ -317,11 +317,9 @@ fn handle_contract_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
     match ContractLocalStorage::new(core_storage.clone()) {
         Ok(contract_storage) => {
             println!("Contract update received: {:?}", data);
-            
-            let is_deleted = data.get("deleted")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(0) == 1;
-            
+
+            let is_deleted = data.get("deleted").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
+
             if !is_deleted {
                 if let Err(e) = contract_storage.save_contract(data) {
                     println!("Failed to save contract: {:?}", e);
@@ -346,11 +344,9 @@ fn handle_location_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
     match LocationLocalStorage::new(core_storage.clone()) {
         Ok(location_storage) => {
             println!("Location update received: {:?}", data);
-            
-            let is_deleted = data.get("deleted")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(0) == 1;
-            
+
+            let is_deleted = data.get("deleted").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
+
             if !is_deleted {
                 if let Err(e) = location_storage.save_location(data) {
                     println!("Failed to save location: {:?}", e);
@@ -375,11 +371,9 @@ fn handle_note_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
     match NoteLocalStorage::new(core_storage.clone()) {
         Ok(note_storage) => {
             println!("Note update received: {:?}", data);
-            
-            let is_deleted = data.get("deleted")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(0) == 1;
-            
+
+            let is_deleted = data.get("deleted").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
+
             if !is_deleted {
                 if let Err(e) = note_storage.save_note(data) {
                     println!("Failed to save note: {:?}", e);
@@ -404,11 +398,9 @@ fn handle_photo_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
     match PhotoLocalStorage::new(core_storage.clone()) {
         Ok(photo_storage) => {
             println!("Photo update received");
-            
-            let is_deleted = data.get("deleted")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(0) == 1;
-            
+
+            let is_deleted = data.get("deleted").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
+
             if !is_deleted {
                 if let Err(e) = photo_storage.save_photo(data) {
                     println!("Failed to save photo: {:?}", e);
@@ -433,11 +425,9 @@ fn handle_sawmill_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
     match SawmillLocalStorage::new(core_storage.clone()) {
         Ok(sawmill_storage) => {
             println!("Sawmill update received: {:?}", data);
-            
-            let is_deleted = data.get("deleted")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(0) == 1;
-            
+
+            let is_deleted = data.get("deleted").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
+
             if !is_deleted {
                 if let Err(e) = sawmill_storage.save_sawmill(data) {
                     println!("Failed to save sawmill: {:?}", e);
@@ -462,11 +452,9 @@ fn handle_shipment_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
     match ShipmentLocalStorage::new(core_storage.clone()) {
         Ok(shipment_storage) => {
             println!("Shipment update received: {:?}", data);
-            
-            let is_deleted = data.get("deleted")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(0) == 1;
-            
+
+            let is_deleted = data.get("deleted").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
+
             if !is_deleted {
                 if let Err(e) = shipment_storage.save_shipment(data) {
                     println!("Failed to save shipment: {:?}", e);
@@ -491,11 +479,9 @@ fn handle_user_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
     match UserLocalStorage::new(core_storage.clone()) {
         Ok(user_storage) => {
             println!("User update received: {:?}", data);
-            
-            let is_deleted = data.get("deleted")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(0) == 1;
-            
+
+            let is_deleted = data.get("deleted").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
+
             if !is_deleted {
                 if let Some(name) = data.get("name").and_then(|n| n.as_str()) {
                     if name.is_empty() {
@@ -503,7 +489,7 @@ fn handle_user_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
                         return;
                     }
                 }
-                
+
                 if let Err(e) = user_storage.save_user(data) {
                     println!("Failed to save user: {:?}", e);
                 }
@@ -560,20 +546,19 @@ async fn send_user_data(
                 });
 
                 send_message(client_id.clone(), &response.to_string(), clients).await;
-            }
-
-            if let Some(newest_user) = users.last() {
-                if let Some(last_edit) = newest_user["lastEdit"].as_i64() {
-                    date = last_edit + 1;
+                if let Some(newest_date) = user["arrivalAtServer"].as_i64() {
+                    if date <= newest_date {
+                        date = newest_date + 1;
+                    }
                 }
             }
         }
     }
 
     let completion_message = serde_json::json!({
-        "type": "user_updated",
+        "type": "user_update",
         "data": serde_json::json!({
-            "new_sync_date": date,
+            "newSyncDate": date,
         }),
         "timestamp": chrono::Utc::now().timestamp_millis()
     });
@@ -620,15 +605,24 @@ async fn send_sawmill_data(
                 });
 
                 send_message(client_id.clone(), &response.to_string(), clients).await;
-            }
-
-            if let Some(newest_sawmill) = sawmills.last() {
-                if let Some(last_edit) = newest_sawmill["lastEdit"].as_i64() {
-                    date = last_edit + 1;
+                if let Some(newest_date) = sawmill["arrivalAtServer"].as_i64() {
+                    if date <= newest_date {
+                        date = newest_date + 1;
+                    }
                 }
             }
         }
     }
+
+    let completion_message = serde_json::json!({
+        "type": "sawmill_update",
+        "data": serde_json::json!({
+            "newSyncDate": date,
+        }),
+        "timestamp": chrono::Utc::now().timestamp_millis()
+    });
+
+    send_message(client_id.clone(), &completion_message.to_string(), clients).await;
 
     date
 }
@@ -670,15 +664,24 @@ async fn send_contract_data(
                 });
 
                 send_message(client_id.clone(), &response.to_string(), clients).await;
-            }
-
-            if let Some(newest_contract) = contracts.last() {
-                if let Some(last_edit) = newest_contract["lastEdit"].as_i64() {
-                    date = last_edit + 1;
+                if let Some(newest_date) = contract["arrivalAtServer"].as_i64() {
+                    if date <= newest_date {
+                        date = newest_date + 1;
+                    }
                 }
             }
         }
     }
+
+    let completion_message = serde_json::json!({
+        "type": "contract_update",
+        "data": serde_json::json!({
+            "newSyncDate": date,
+        }),
+        "timestamp": chrono::Utc::now().timestamp_millis()
+    });
+
+    send_message(client_id.clone(), &completion_message.to_string(), clients).await;
 
     date
 }
@@ -721,15 +724,24 @@ async fn send_photo_data(
 
                 send_message(client_id.clone(), &response.to_string(), clients).await;
                 tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-            }
-
-            if let Some(newest_photo) = photos.last() {
-                if let Some(last_edit) = newest_photo["lastEdit"].as_i64() {
-                    date = last_edit + 1;
+                if let Some(newest_date) = photo["arrivalAtServer"].as_i64() {
+                    if date <= newest_date {
+                        date = newest_date + 1;
+                    }
                 }
             }
         }
     }
+
+    let completion_message = serde_json::json!({
+        "type": "photo_update",
+        "data": serde_json::json!({
+            "newSyncDate": date,
+        }),
+        "timestamp": chrono::Utc::now().timestamp_millis()
+    });
+
+    send_message(client_id.clone(), &completion_message.to_string(), clients).await;
 
     date
 }
@@ -771,15 +783,24 @@ async fn send_note_data(
                 });
 
                 send_message(client_id.clone(), &response.to_string(), clients).await;
-            }
-
-            if let Some(newest_note) = notes.last() {
-                if let Some(last_edit) = newest_note["lastEdit"].as_i64() {
-                    date = last_edit + 1;
+                if let Some(newest_date) = note["arrivalAtServer"].as_i64() {
+                    if date <= newest_date {
+                        date = newest_date + 1;
+                    }
                 }
             }
         }
     }
+
+    let completion_message = serde_json::json!({
+        "type": "note_update",
+        "data": serde_json::json!({
+            "newSyncDate": date,
+        }),
+        "timestamp": chrono::Utc::now().timestamp_millis()
+    });
+
+    send_message(client_id.clone(), &completion_message.to_string(), clients).await;
 
     date
 }
@@ -821,15 +842,24 @@ async fn send_location_data(
                 });
 
                 send_message(client_id.clone(), &response.to_string(), clients).await;
-            }
-
-            if let Some(newest_location) = locations.last() {
-                if let Some(last_edit) = newest_location["lastEdit"].as_i64() {
-                    date = last_edit + 1;
+                if let Some(newest_date) = location["arrivalAtServer"].as_i64() {
+                    if date <= newest_date {
+                        date = newest_date + 1;
+                    }
                 }
             }
         }
     }
+
+    let completion_message = serde_json::json!({
+        "type": "location_update",
+        "data": serde_json::json!({
+            "newSyncDate": date,
+        }),
+        "timestamp": chrono::Utc::now().timestamp_millis()
+    });
+
+    send_message(client_id.clone(), &completion_message.to_string(), clients).await;
 
     date
 }
@@ -871,15 +901,24 @@ async fn send_shipment_data(
                 });
 
                 send_message(client_id.clone(), &response.to_string(), clients).await;
-            }
-
-            if let Some(newest_shipment) = shipments.last() {
-                if let Some(last_edit) = newest_shipment["lastEdit"].as_i64() {
-                    date = last_edit + 1;
+                if let Some(newest_date) = shipment["arrivalAtServer"].as_i64() {
+                    if date <= newest_date {
+                        date = newest_date + 1;
+                    }
                 }
             }
         }
     }
+
+    let completion_message = serde_json::json!({
+        "type": "shipment_update",
+        "data": serde_json::json!({
+            "newSyncDate": date,
+        }),
+        "timestamp": chrono::Utc::now().timestamp_millis()
+    });
+
+    send_message(client_id.clone(), &completion_message.to_string(), clients).await;
 
     date
 }
@@ -903,44 +942,37 @@ async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients)
 
     let last_user_sync = data
         .get("user_update")
-        .and_then(|v| v.as_str())
-        .and_then(|s| s.parse::<i64>().ok())
+        .and_then(|v| v.as_i64())
         .unwrap_or(0);
 
     let last_sawmill_sync = data
         .get("sawmill_update")
-        .and_then(|v| v.as_str())
-        .and_then(|s| s.parse::<i64>().ok())
+        .and_then(|v| v.as_i64())
         .unwrap_or(0);
 
     let last_contract_sync = data
         .get("contract_update")
-        .and_then(|v| v.as_str())
-        .and_then(|s| s.parse::<i64>().ok())
+        .and_then(|v| v.as_i64())
         .unwrap_or(0);
 
     let last_note_sync = data
         .get("note_update")
-        .and_then(|v| v.as_str())
-        .and_then(|s| s.parse::<i64>().ok())
+        .and_then(|v| v.as_i64())
         .unwrap_or(0);
 
     let last_location_sync = data
         .get("location_update")
-        .and_then(|v| v.as_str())
-        .and_then(|s| s.parse::<i64>().ok())
+        .and_then(|v| v.as_i64())
         .unwrap_or(0);
 
     let last_shipment_sync = data
         .get("shipment_update")
-        .and_then(|v| v.as_str())
-        .and_then(|s| s.parse::<i64>().ok())
+        .and_then(|v| v.as_i64())
         .unwrap_or(0);
 
     let last_photo_sync = data
         .get("photo_update")
-        .and_then(|v| v.as_str())
-        .and_then(|s| s.parse::<i64>().ok())
+        .and_then(|v| v.as_i64())
         .unwrap_or(0);
 
     send_user_data(
@@ -1038,25 +1070,32 @@ async fn broadcast_message(client_id: String, msg: &str, clients: &Clients) {
                                 println!("Error sending message to client {}: {:?}", id, e);
                             }
                         } else {
-                            let is_deleted = json_msg.get("data")
+                            let is_deleted = json_msg
+                                .get("data")
                                 .and_then(|data| data.get("deleted"))
                                 .and_then(|deleted| deleted.as_i64())
-                                .unwrap_or(0) == 1;
-                            
+                                .unwrap_or(0)
+                                == 1;
+
                             if is_deleted {
                                 if let Err(e) = client.sender.send(Message::text(msg)) {
-                                    println!("Error sending delete confirmation to client {}: {:?}", id, e);
+                                    println!(
+                                        "Error sending delete confirmation to client {}: {:?}",
+                                        id, e
+                                    );
                                 }
                             } else {
-                                let msg_type = json_msg.get("type")
+                                let msg_type = json_msg
+                                    .get("type")
                                     .and_then(|v| v.as_str())
                                     .unwrap_or("unknown");
-                                
-                                let entity_id = json_msg.get("data")
+
+                                let entity_id = json_msg
+                                    .get("data")
                                     .and_then(|data| data.get("id"))
                                     .cloned()
                                     .unwrap_or(json!("unknown"));
-                                
+
                                 let confirm_msg = json!({
                                     "type": msg_type,
                                     "data": {
@@ -1065,9 +1104,14 @@ async fn broadcast_message(client_id: String, msg: &str, clients: &Clients) {
                                     },
                                     "timestamp": chrono::Utc::now().timestamp_millis()
                                 });
-                                
-                                if let Err(e) = client.sender.send(Message::text(&confirm_msg.to_string())) {
-                                    println!("Error sending sync confirmation to client {}: {:?}", id, e);
+
+                                if let Err(e) =
+                                    client.sender.send(Message::text(&confirm_msg.to_string()))
+                                {
+                                    println!(
+                                        "Error sending sync confirmation to client {}: {:?}",
+                                        id, e
+                                    );
                                 }
                             }
                         }

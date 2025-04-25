@@ -96,7 +96,7 @@ impl CoreLocalStorage {
             let placeholder_str = placeholders.join(", ");
 
             let query = format!(
-                "INSERT INTO {} ({}) VALUES ({})",
+                "INSERT OR REPLACE INTO {} ({}) VALUES ({})",
                 table_name, column_str, placeholder_str
             );
 

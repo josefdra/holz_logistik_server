@@ -29,12 +29,14 @@ impl PhotoLocalStorage {
             let last_edit: i64 = row.get(1)?;
             let photo_file: Vec<u8> = row.get(2)?; 
             let location_id: String = row.get(3)?;
+            let arrival_at_server: i64 = row.get(4)?;
 
             let photo_json = serde_json::json!({
                 "id": id,
                 "lastEdit": last_edit,
                 "photoFile": photo_file,
                 "locationId": location_id,
+                "arrivalAtServer": arrival_at_server
             });
 
             Ok(photo_json)

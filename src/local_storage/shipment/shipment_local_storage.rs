@@ -34,6 +34,7 @@ impl ShipmentLocalStorage {
             let contract_id: String = row.get(6)?;
             let sawmill_id: String = row.get(7)?;
             let location_id: String = row.get(8)?;
+            let arrival_at_server: i64 = row.get(9)?;
 
             let shipment_json = serde_json::json!({
                 "id": id,
@@ -45,6 +46,7 @@ impl ShipmentLocalStorage {
                 "contractId": contract_id,
                 "sawmillId": sawmill_id,
                 "locationId": location_id,
+                "arrivalAtServer": arrival_at_server
             });
 
             Ok(shipment_json)

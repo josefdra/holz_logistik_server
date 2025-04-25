@@ -29,12 +29,14 @@ impl NoteLocalStorage {
             let last_edit: i64 = row.get(1)?;
             let text: String = row.get(2)?;
             let user_id: String = row.get(3)?;
+            let arrival_at_server: i64 = row.get(4)?;
 
             let note_json = serde_json::json!({
                 "id": id,
                 "lastEdit": last_edit,
                 "text": text,
                 "userId": user_id,
+                "arrivalAtServer": arrival_at_server
             });
 
             Ok(note_json)

@@ -28,8 +28,8 @@ CREATE TABLE IF NOT EXISTS users (
     lastEdit INTEGER NOT NULL,
     role INTEGER NOT NULL,
     name TEXT NOT NULL,
-    deleted INTEGER DEFAULT 0,
-    arrivalAtServer INTEGER NOT NULL
+    arrivalAtServer INTEGER NOT NULL,
+    deleted INTEGER DEFAULT 0
 );
 
 -- Contracts table
@@ -44,8 +44,8 @@ CREATE TABLE IF NOT EXISTS contracts (
     availableQuantity REAL NOT NULL,
     bookedQuantity REAL NOT NULL,
     shippedQuantity REAL NOT NULL,
-    deleted INTEGER DEFAULT 0,
-    arrivalAtServer INTEGER NOT NULL
+    arrivalAtServer INTEGER NOT NULL,
+    deleted INTEGER DEFAULT 0
 );
 
 -- Sawmills table
@@ -53,8 +53,8 @@ CREATE TABLE IF NOT EXISTS sawmills (
     id TEXT PRIMARY KEY NOT NULL,
     lastEdit INTEGER NOT NULL,
     name TEXT NOT NULL,
-    deleted INTEGER DEFAULT 0,
-    arrivalAtServer INTEGER NOT NULL
+    arrivalAtServer INTEGER NOT NULL,
+    deleted INTEGER DEFAULT 0
 );
 
 -- Locations table
@@ -75,8 +75,8 @@ CREATE TABLE IF NOT EXISTS locations (
     currentOversizeQuantity REAL NOT NULL,
     currentPieceCount INTEGER NOT NULL,
     contractId TEXT NOT NULL,
-    deleted INTEGER DEFAULT 0,
-    arrivalAtServer INTEGER NOT NULL
+    arrivalAtServer INTEGER NOT NULL,
+    deleted INTEGER DEFAULT 0
 );
 
 -- Location-Sawmill Junction table
@@ -95,8 +95,8 @@ CREATE TABLE IF NOT EXISTS notes (
     lastEdit INTEGER NOT NULL,
     text TEXT NOT NULL,
     userId TEXT NOT NULL,
-    deleted INTEGER DEFAULT 0,
-    arrivalAtServer INTEGER NOT NULL
+    arrivalAtServer INTEGER NOT NULL,
+    deleted INTEGER DEFAULT 0
 );
 
 -- Photos table
@@ -105,8 +105,8 @@ CREATE TABLE IF NOT EXISTS photos (
     lastEdit INTEGER NOT NULL,
     photoFile BLOB NOT NULL,
     locationId TEXT NOT NULL,
-    deleted INTEGER DEFAULT 0,
-    arrivalAtServer INTEGER NOT NULL
+    arrivalAtServer INTEGER NOT NULL,
+    deleted INTEGER DEFAULT 0
 );
 
 -- Shipments table
@@ -120,8 +120,8 @@ CREATE TABLE IF NOT EXISTS shipments (
     contractId TEXT NOT NULL,
     sawmillId TEXT NOT NULL,
     locationId TEXT NOT NULL,
-    deleted INTEGER DEFAULT 0,
-    arrivalAtServer INTEGER NOT NULL
+    arrivalAtServer INTEGER NOT NULL,
+    deleted INTEGER DEFAULT 0
 );
 EOL
 

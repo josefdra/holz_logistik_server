@@ -35,6 +35,7 @@ impl ContractLocalStorage {
             let available_quantity: f64 = row.get(7)?;
             let booked_quantity: f64 = row.get(8)?;
             let shipped_quantity: f64 = row.get(9)?;
+            let arrival_at_server: i64 = row.get(10)?;
 
             let contract_json = serde_json::json!({
                 "id": id,
@@ -47,6 +48,7 @@ impl ContractLocalStorage {
                 "availableQuantity": available_quantity,
                 "bookedQuantity": booked_quantity,
                 "shippedQuantity": shipped_quantity,
+                "arrivalAtServer": arrival_at_server
             });
 
             Ok(contract_json)
