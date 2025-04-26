@@ -18,7 +18,7 @@ impl ContractLocalStorage {
 
     pub fn get_contract_updates_by_date(&self, last_edit: i64) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT * FROM contracts WHERE deleted = 0 AND arrivalAtServer > ? ORDER BY lastEdit ASC",
+            "SELECT * FROM contracts WHERE arrivalAtServer > ? ORDER BY lastEdit ASC",
         );
 
         let conn = self.core_storage.get_connection()?;
@@ -36,6 +36,7 @@ impl ContractLocalStorage {
             let booked_quantity: f64 = row.get(8)?;
             let shipped_quantity: f64 = row.get(9)?;
             let arrival_at_server: i64 = row.get(10)?;
+            let deleted: i64 = row.get(11)?;
 
             let contract_json = serde_json::json!({
                 "id": id,
@@ -48,7 +49,8 @@ impl ContractLocalStorage {
                 "availableQuantity": available_quantity,
                 "bookedQuantity": booked_quantity,
                 "shippedQuantity": shipped_quantity,
-                "arrivalAtServer": arrival_at_server
+                "arrivalAtServer": arrival_at_server,
+                "deleted": deleted
             });
 
             Ok(contract_json)
@@ -65,7 +67,7 @@ impl ContractLocalStorage {
         Ok(contracts)
     }
 
-    pub fn save_contract(&self, contract_data: &Value) -> Result<i64> {
+    pub fn save_contract(&self, contract_data: &Value) -> Result<bool> {
         let mut contract_for_save = contract_data.clone();
         if let serde_json::Value::Object(ref mut map) = contract_for_save {
             map.insert("arrivalAtServer".to_string(), chrono::Utc::now().timestamp_millis().into());

@@ -18,7 +18,7 @@ impl PhotoLocalStorage {
 
     pub fn get_photo_updates_by_date(&self, last_edit: i64) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT * FROM photos WHERE deleted = 0 AND arrivalAtServer > ? ORDER BY lastEdit ASC",
+            "SELECT * FROM photos WHERE arrivalAtServer > ? ORDER BY lastEdit ASC",
         );
 
         let conn = self.core_storage.get_connection()?;
@@ -30,13 +30,15 @@ impl PhotoLocalStorage {
             let photo_file: Vec<u8> = row.get(2)?; 
             let location_id: String = row.get(3)?;
             let arrival_at_server: i64 = row.get(4)?;
+            let deleted: i64 = row.get(5)?;
 
             let photo_json = serde_json::json!({
                 "id": id,
                 "lastEdit": last_edit,
                 "photoFile": photo_file,
                 "locationId": location_id,
-                "arrivalAtServer": arrival_at_server
+                "arrivalAtServer": arrival_at_server,
+                "deleted": deleted
             });
 
             Ok(photo_json)
@@ -53,7 +55,7 @@ impl PhotoLocalStorage {
         Ok(photos)
     }
 
-    pub fn save_photo(&self, photo_data: &Value) -> Result<i64> {
+    pub fn save_photo(&self, photo_data: &Value) -> Result<bool> {
         let id = photo_data["id"].as_str().unwrap_or_default();
         let last_edit = photo_data["lastEdit"].as_i64().unwrap_or(0);
         let photo_file = match &photo_data["photoFile"] {
@@ -73,7 +75,7 @@ impl PhotoLocalStorage {
             "INSERT OR REPLACE INTO photos (id, lastEdit, photoFile, locationId, arrivalAtServer) VALUES (?, ?, ?, ?, ?)",
         );
 
-        let result = conn.execute(
+        conn.execute(
             &query,
             params![
                 id,
@@ -84,6 +86,6 @@ impl PhotoLocalStorage {
             ],
         )?;
 
-        Ok(result as i64)
+        Ok(true)
     }
 }

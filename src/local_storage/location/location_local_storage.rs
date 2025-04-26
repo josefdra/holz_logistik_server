@@ -45,7 +45,7 @@ impl LocationLocalStorage {
     pub fn get_location_updates_by_date(&self, last_edit: i64) -> Result<Vec<Value>> {
         let location_ids = {
             let query = format!(
-                "SELECT id FROM locations WHERE deleted = 0 AND arrivalAtServer > ? ORDER BY lastEdit ASC",
+                "SELECT id FROM locations WHERE arrivalAtServer > ? ORDER BY lastEdit ASC",
             );
 
             let conn = self.core_storage.get_connection()?;
@@ -128,7 +128,7 @@ impl LocationLocalStorage {
             .insert("locationSawmillJunction", &junction_data)
     }
 
-    pub fn save_location(&self, location_data: &Value) -> Result<i64> {
+    pub fn save_location(&self, location_data: &Value) -> Result<bool> {
         let location_id = location_data["id"].as_str().unwrap_or("");
 
         self.core_storage.delete_by_column(

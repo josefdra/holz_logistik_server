@@ -18,7 +18,7 @@ impl NoteLocalStorage {
 
     pub fn get_note_updates_by_date(&self, last_edit: i64) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT * FROM notes WHERE deleted = 0 AND arrivalAtServer > ? ORDER BY lastEdit ASC",
+            "SELECT * FROM notes WHERE arrivalAtServer > ? ORDER BY lastEdit ASC",
         );
 
         let conn = self.core_storage.get_connection()?;
@@ -30,13 +30,15 @@ impl NoteLocalStorage {
             let text: String = row.get(2)?;
             let user_id: String = row.get(3)?;
             let arrival_at_server: i64 = row.get(4)?;
+            let deleted: i64 = row.get(5)?;
 
             let note_json = serde_json::json!({
                 "id": id,
                 "lastEdit": last_edit,
                 "text": text,
                 "userId": user_id,
-                "arrivalAtServer": arrival_at_server
+                "arrivalAtServer": arrival_at_server,
+                "deleted": deleted
             });
 
             Ok(note_json)
@@ -53,7 +55,7 @@ impl NoteLocalStorage {
         Ok(notes)
     }
 
-    pub fn save_note(&self, note_data: &Value) -> Result<i64> {
+    pub fn save_note(&self, note_data: &Value) -> Result<bool> {
         let mut note_for_save = note_data.clone();
         if let serde_json::Value::Object(ref mut map) = note_for_save {
             map.insert("arrivalAtServer".to_string(), chrono::Utc::now().timestamp_millis().into());

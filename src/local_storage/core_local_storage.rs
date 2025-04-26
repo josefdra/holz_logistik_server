@@ -26,9 +26,40 @@ impl CoreLocalStorage {
         }
     }
 
-    pub fn get_by_id(&self, table_name: &str, id: &str) -> Result<Vec<serde_json::Value>> {
+    pub fn get_existing_by_id(&self, table_name: &str, id: &str) -> Result<Vec<serde_json::Value>> {
         let conn = self.get_connection()?;
         let query = format!("SELECT * FROM {} WHERE deleted = 0 AND id = ?", table_name);
+
+        let mut stmt = conn.prepare(&query)?;
+
+        let column_names: Vec<String> = stmt
+            .column_names()
+            .into_iter()
+            .map(|name| name.to_string())
+            .collect();
+
+        let rows = stmt.query_map(params![id], |row| {
+            let mut map = serde_json::Map::new();
+            for (i, column_name) in column_names.iter().enumerate() {
+                let value = self.get_value_from_row(row, i)?;
+                map.insert(column_name.to_string(), value);
+            }
+            Ok(serde_json::Value::Object(map))
+        })?;
+
+        let mut results = Vec::new();
+        for row_result in rows {
+            if let Ok(row_value) = row_result {
+                results.push(row_value);
+            }
+        }
+
+        Ok(results)
+    }
+
+    pub fn get_by_id(&self, table_name: &str, id: &str) -> Result<Vec<serde_json::Value>> {
+        let conn = self.get_connection()?;
+        let query = format!("SELECT * FROM {} WHERE id = ?", table_name);
 
         let mut stmt = conn.prepare(&query)?;
 
@@ -159,7 +190,7 @@ impl CoreLocalStorage {
 
             if !has_last_edit {
             } else {
-                let query = format!("SELECT lastEdit FROM {} WHERE deleted = 0 AND id = ?", table_name);
+                let query = format!("SELECT lastEdit FROM {} WHERE id = ?", table_name);
                 let mut stmt = conn.prepare(&query)?;
 
                 let existing_last_edit: i64 =
@@ -187,7 +218,7 @@ impl CoreLocalStorage {
             param_values.push(json_to_param(id));
 
             let update_str = updates.join(", ");
-            let query = format!("UPDATE {} SET {} WHERE deleted = 0 AND id = ?", table_name, update_str);
+            let query = format!("UPDATE {} SET {} WHERE id = ?", table_name, update_str);
 
             let mut stmt = conn.prepare(&query)?;
             let rows_affected = stmt.execute(rusqlite::params_from_iter(param_values))?;
@@ -199,28 +230,41 @@ impl CoreLocalStorage {
         }
     }
 
-    pub fn insert_or_update(&self, table_name: &str, data: &serde_json::Value) -> Result<i64> {
+    pub fn insert_or_update(&self, table_name: &str, data: &serde_json::Value) -> Result<bool> {
         if let serde_json::Value::Object(map) = data {
             if !map.contains_key("id") {
                 return Err(rusqlite::Error::InvalidParameterName(
                     "Data must contain an 'id' field".to_string(),
                 ));
             }
-
+    
             let id = map.get("id").unwrap().as_str().unwrap_or("");
-            let existing = self.get_by_id(table_name, id)?;
-
+            
+            let existing = match self.get_by_id(table_name, id) {
+                Ok(records) => records,
+                Err(e) => return Err(e)
+            };
+    
             if !existing.is_empty() {
-                self.update(table_name, data)?;
-                Ok(0)
+                if let Some(item) = existing.first() {
+                    if let Some(deleted) = item.get("deleted") {
+                        if deleted.as_i64() == Some(0) {
+                            self.update(table_name, data)?;
+                            return Ok(true);
+                        }
+                    }
+                }
             } else {
-                self.insert(table_name, data)
+                self.insert(table_name, data)?;
+                return Ok(true);
             }
         } else {
-            Err(rusqlite::Error::InvalidParameterName(
+            return Err(rusqlite::Error::InvalidParameterName(
                 "Data must be a JSON object".to_string(),
-            ))
+            ));
         }
+    
+        Ok(false)
     }
 
     pub fn delete_by_column(
@@ -239,38 +283,10 @@ impl CoreLocalStorage {
     pub fn mark_as_deleted(&self, table_name: &str, id: &str) -> Result<usize> {
         let conn = self.get_connection()?;
         
-        let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", table_name))?;
-        let columns = stmt.query_map([], |row| Ok(row.get::<_, String>(1)?))?;
-        let mut has_deleted_column = false;
-        let mut has_last_edit_column = false;
-        
-        for column_result in columns {
-            let column_name = column_result?;
-            if column_name == "deleted" {
-                has_deleted_column = true;
-            } else if column_name == "lastEdit" {
-                has_last_edit_column = true;
-            }
-        }
-        
-        if !has_deleted_column {
-            return Err(rusqlite::Error::InvalidParameterName(
-                format!("Table '{}' does not have a 'deleted' column", table_name)
-            ));
-        }
-        
         let current_time = chrono::Utc::now().timestamp_millis();
-        let query = if has_last_edit_column {
-            format!("UPDATE {} SET deleted = 1, lastEdit = ?, arrivalAtServer = ? WHERE id = ?", table_name)
-        } else {
-            format!("UPDATE {} SET deleted = 1, arrivalAtServer = ? WHERE id = ?", table_name)
-        };
+        let query = format!("UPDATE {} SET deleted = 1, lastEdit = ?, arrivalAtServer = ? WHERE id = ?", table_name);
         
-        let result = if has_last_edit_column {
-            conn.execute(&query, params![current_time, current_time, id])?
-        } else {
-            conn.execute(&query, params![current_time, id])?
-        };
+        let result = conn.execute(&query, params![current_time, current_time, id])?;
         
         Ok(result)
     }

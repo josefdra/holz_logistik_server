@@ -279,7 +279,7 @@ async fn handle_authentication_request(
     true
 }
 
-async fn handle_client_message(msg_type: &str, data: &Value, client_id: &str, clients: &Clients) {
+async fn handle_client_message(msg_type: &str, msg: &str, data: &Value, client_id: &str, clients: &Clients,) {
     let db_path = match get_client_db_path(client_id, clients) {
         Some(path) => path,
         None => {
@@ -302,18 +302,53 @@ async fn handle_client_message(msg_type: &str, data: &Value, client_id: &str, cl
     };
 
     match msg_type {
-        "contract_update" => handle_contract_update(&data, core_storage.clone()),
-        "location_update" => handle_location_update(&data, core_storage.clone()),
-        "note_update" => handle_note_update(&data, core_storage.clone()),
-        "photo_update" => handle_photo_update(&data, core_storage.clone()),
-        "sawmill_update" => handle_sawmill_update(&data, core_storage.clone()),
-        "shipment_update" => handle_shipment_update(&data, core_storage.clone()),
-        "user_update" => handle_user_update(&data, core_storage.clone()),
+        "contract_update" => {
+            let update_happened = handle_contract_update(&data, core_storage.clone());
+            if update_happened {
+                broadcast_message(client_id.to_string(), msg, &clients).await;
+            }
+        },
+        "location_update" => {
+            let update_happened = handle_location_update(&data, core_storage.clone());
+            if update_happened {
+                broadcast_message(client_id.to_string(), msg, &clients).await;
+            }
+        },
+        "note_update" => {
+            let update_happened = handle_note_update(&data, core_storage.clone());
+            if update_happened {
+                broadcast_message(client_id.to_string(), msg, &clients).await;
+            }
+        },
+        "photo_update" => {
+            let update_happened = handle_photo_update(&data, core_storage.clone());
+            if update_happened {
+                broadcast_message(client_id.to_string(), msg, &clients).await;
+            }
+        },
+        "sawmill_update" => {
+            let update_happened = handle_sawmill_update(&data, core_storage.clone());
+            if update_happened {
+                broadcast_message(client_id.to_string(), msg, &clients).await;
+            }
+        },
+        "shipment_update" => {
+            let update_happened = handle_shipment_update(&data, core_storage.clone());
+            if update_happened {
+                broadcast_message(client_id.to_string(), msg, &clients).await;
+            }
+        },
+        "user_update" => {
+            let update_happened = handle_user_update(&data, core_storage.clone());
+            if update_happened {
+                broadcast_message(client_id.to_string(), msg, &clients).await;
+            }
+        },
         _ => println!("Unknown message type: {}", msg_type),
     }
 }
 
-fn handle_contract_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
+fn handle_contract_update(data: &Value, core_storage: Arc<CoreLocalStorage>) -> bool {
     match ContractLocalStorage::new(core_storage.clone()) {
         Ok(contract_storage) => {
             println!("Contract update received: {:?}", data);
@@ -321,26 +356,38 @@ fn handle_contract_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
             let is_deleted = data.get("deleted").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
 
             if !is_deleted {
-                if let Err(e) = contract_storage.save_contract(data) {
-                    println!("Failed to save contract: {:?}", e);
+                match contract_storage.save_contract(data) {
+                    Ok(success) => {
+                        success
+                    },
+                    Err(e) => {
+                        println!("Failed to save contract: {:?}", e);
+                        false
+                    }
                 }
             } else {
                 if let Some(id) = data.get("id").and_then(|v| v.as_str()) {
-                    if let Err(e) = core_storage.mark_as_deleted("contracts", id) {
-                        println!("Failed to mark contract as deleted: {:?}", e);
+                    match core_storage.mark_as_deleted("contracts", id) {
+                        Ok(_) => true,
+                        Err(e) => {
+                            println!("Failed to mark contract as deleted: {:?}", e);
+                            false
+                        }
                     }
                 } else {
                     println!("Failed to mark contract as deleted: Missing ID");
+                    false
                 }
             }
         }
         Err(e) => {
             println!("Failed to create contract storage: {:?}", e);
+            false
         }
     }
 }
 
-fn handle_location_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
+fn handle_location_update(data: &Value, core_storage: Arc<CoreLocalStorage>) -> bool {
     match LocationLocalStorage::new(core_storage.clone()) {
         Ok(location_storage) => {
             println!("Location update received: {:?}", data);
@@ -348,26 +395,36 @@ fn handle_location_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
             let is_deleted = data.get("deleted").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
 
             if !is_deleted {
-                if let Err(e) = location_storage.save_location(data) {
-                    println!("Failed to save location: {:?}", e);
+                match location_storage.save_location(data) {
+                    Ok(success) => success,
+                    Err(e) => {
+                        println!("Failed to save location: {:?}", e);
+                        false
+                    }
                 }
             } else {
                 if let Some(id) = data.get("id").and_then(|v| v.as_str()) {
-                    if let Err(e) = core_storage.mark_as_deleted("locations", id) {
-                        println!("Failed to mark location as deleted: {:?}", e);
+                    match core_storage.mark_as_deleted("locations", id) {
+                        Ok(_) => true,
+                        Err(e) => {
+                            println!("Failed to mark location as deleted: {:?}", e);
+                            false
+                        }
                     }
                 } else {
                     println!("Failed to mark location as deleted: Missing ID");
+                    false
                 }
             }
         }
         Err(e) => {
             println!("Failed to create location storage: {:?}", e);
+            false
         }
     }
 }
 
-fn handle_note_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
+fn handle_note_update(data: &Value, core_storage: Arc<CoreLocalStorage>) -> bool {
     match NoteLocalStorage::new(core_storage.clone()) {
         Ok(note_storage) => {
             println!("Note update received: {:?}", data);
@@ -375,26 +432,36 @@ fn handle_note_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
             let is_deleted = data.get("deleted").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
 
             if !is_deleted {
-                if let Err(e) = note_storage.save_note(data) {
-                    println!("Failed to save note: {:?}", e);
+                match note_storage.save_note(data) {
+                    Ok(success) => success,
+                    Err(e) => {
+                        println!("Failed to save note: {:?}", e);
+                        false
+                    }
                 }
             } else {
                 if let Some(id) = data.get("id").and_then(|v| v.as_str()) {
-                    if let Err(e) = core_storage.mark_as_deleted("notes", id) {
-                        println!("Failed to mark note as deleted: {:?}", e);
+                    match core_storage.mark_as_deleted("notes", id) {
+                        Ok(_) => true,
+                        Err(e) => {
+                            println!("Failed to mark note as deleted: {:?}", e);
+                            false
+                        }
                     }
                 } else {
                     println!("Failed to mark note as deleted: Missing ID");
+                    false
                 }
             }
         }
         Err(e) => {
             println!("Failed to create note storage: {:?}", e);
+            false
         }
     }
 }
 
-fn handle_photo_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
+fn handle_photo_update(data: &Value, core_storage: Arc<CoreLocalStorage>) -> bool {
     match PhotoLocalStorage::new(core_storage.clone()) {
         Ok(photo_storage) => {
             println!("Photo update received");
@@ -402,26 +469,36 @@ fn handle_photo_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
             let is_deleted = data.get("deleted").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
 
             if !is_deleted {
-                if let Err(e) = photo_storage.save_photo(data) {
-                    println!("Failed to save photo: {:?}", e);
+                match photo_storage.save_photo(data) {
+                    Ok(success) => success,
+                    Err(e) => {
+                        println!("Failed to save photo: {:?}", e);
+                        false
+                    }
                 }
             } else {
                 if let Some(id) = data.get("id").and_then(|v| v.as_str()) {
-                    if let Err(e) = core_storage.mark_as_deleted("photos", id) {
-                        println!("Failed to mark photo as deleted: {:?}", e);
+                    match core_storage.mark_as_deleted("photos", id) {
+                        Ok(_) => true,
+                        Err(e) => {
+                            println!("Failed to mark photo as deleted: {:?}", e);
+                            false
+                        }
                     }
                 } else {
                     println!("Failed to mark photo as deleted: Missing ID");
+                    false
                 }
             }
         }
         Err(e) => {
             println!("Failed to create photo storage: {:?}", e);
+            false
         }
     }
 }
 
-fn handle_sawmill_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
+fn handle_sawmill_update(data: &Value, core_storage: Arc<CoreLocalStorage>) -> bool {
     match SawmillLocalStorage::new(core_storage.clone()) {
         Ok(sawmill_storage) => {
             println!("Sawmill update received: {:?}", data);
@@ -429,26 +506,36 @@ fn handle_sawmill_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
             let is_deleted = data.get("deleted").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
 
             if !is_deleted {
-                if let Err(e) = sawmill_storage.save_sawmill(data) {
-                    println!("Failed to save sawmill: {:?}", e);
+                match sawmill_storage.save_sawmill(data) {
+                    Ok(success) => success,
+                    Err(e) => {
+                        println!("Failed to save sawmill: {:?}", e);
+                        false
+                    }
                 }
             } else {
                 if let Some(id) = data.get("id").and_then(|v| v.as_str()) {
-                    if let Err(e) = core_storage.mark_as_deleted("sawmills", id) {
-                        println!("Failed to mark sawmill as deleted: {:?}", e);
+                    match core_storage.mark_as_deleted("sawmills", id) {
+                        Ok(_) => true,
+                        Err(e) => {
+                            println!("Failed to mark sawmill as deleted: {:?}", e);
+                            false
+                        }
                     }
                 } else {
                     println!("Failed to mark sawmill as deleted: Missing ID");
+                    false
                 }
             }
         }
         Err(e) => {
             println!("Failed to create sawmill storage: {:?}", e);
+            false
         }
     }
 }
 
-fn handle_shipment_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
+fn handle_shipment_update(data: &Value, core_storage: Arc<CoreLocalStorage>) -> bool {
     match ShipmentLocalStorage::new(core_storage.clone()) {
         Ok(shipment_storage) => {
             println!("Shipment update received: {:?}", data);
@@ -456,26 +543,36 @@ fn handle_shipment_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
             let is_deleted = data.get("deleted").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
 
             if !is_deleted {
-                if let Err(e) = shipment_storage.save_shipment(data) {
-                    println!("Failed to save shipment: {:?}", e);
+                match shipment_storage.save_shipment(data) {
+                    Ok(success) => success,
+                    Err(e) => {
+                        println!("Failed to save shipment: {:?}", e);
+                        false
+                    }
                 }
             } else {
                 if let Some(id) = data.get("id").and_then(|v| v.as_str()) {
-                    if let Err(e) = core_storage.mark_as_deleted("shipments", id) {
-                        println!("Failed to mark shipment as deleted: {:?}", e);
+                    match core_storage.mark_as_deleted("shipments", id) {
+                        Ok(_) => true,
+                        Err(e) => {
+                            println!("Failed to mark shipment as deleted: {:?}", e);
+                            false
+                        }
                     }
                 } else {
                     println!("Failed to mark shipment as deleted: Missing ID");
+                    false
                 }
             }
         }
         Err(e) => {
             println!("Failed to create shipment storage: {:?}", e);
+            false
         }
     }
 }
 
-fn handle_user_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
+fn handle_user_update(data: &Value, core_storage: Arc<CoreLocalStorage>) -> bool {
     match UserLocalStorage::new(core_storage.clone()) {
         Ok(user_storage) => {
             println!("User update received: {:?}", data);
@@ -486,25 +583,35 @@ fn handle_user_update(data: &Value, core_storage: Arc<CoreLocalStorage>) {
                 if let Some(name) = data.get("name").and_then(|n| n.as_str()) {
                     if name.is_empty() {
                         println!("Empty user name");
-                        return;
+                        return false;
                     }
                 }
 
-                if let Err(e) = user_storage.save_user(data) {
-                    println!("Failed to save user: {:?}", e);
+                match user_storage.save_user(data) {
+                    Ok(success) => success,
+                    Err(e) => {
+                        println!("Failed to save user: {:?}", e);
+                        false
+                    }
                 }
             } else {
                 if let Some(id) = data.get("id").and_then(|v| v.as_str()) {
-                    if let Err(e) = core_storage.mark_as_deleted("users", id) {
-                        println!("Failed to mark user as deleted: {:?}", e);
+                    match core_storage.mark_as_deleted("users", id) {
+                        Ok(_) => true,
+                        Err(e) => {
+                            println!("Failed to mark user as deleted: {:?}", e);
+                            false
+                        }
                     }
                 } else {
                     println!("Failed to mark user as deleted: Missing ID");
+                    false
                 }
             }
         }
         Err(e) => {
             println!("Failed to create user storage: {:?}", e);
+            false
         }
     }
 }
@@ -842,6 +949,9 @@ async fn send_location_data(
                 });
 
                 send_message(client_id.clone(), &response.to_string(), clients).await;
+
+                println!("{}", &response.to_string());
+
                 if let Some(newest_date) = location["arrivalAtServer"].as_i64() {
                     if date <= newest_date {
                         date = newest_date + 1;
@@ -1038,6 +1148,7 @@ async fn send_message(client_id: String, msg: &str, clients: &Clients) {
     match clients.lock() {
         Ok(clients_lock) => {
             if let Some(client) = clients_lock.get(&client_id) {
+                println!("{}", msg.to_string());
                 if let Err(e) = client.sender.send(Message::text(msg)) {
                     println!("Error sending message to client {}: {:?}", client_id, e);
                 }
@@ -1064,7 +1175,7 @@ async fn broadcast_message(client_id: String, msg: &str, clients: &Clients) {
         match clients.lock() {
             Ok(clients_lock) => {
                 for (id, client) in clients_lock.iter() {
-                    if !client.db_name.is_empty() && client.sync_completed {
+                    if !client.db_name.is_empty() {
                         if id != &client_id {
                             if let Err(e) = client.sender.send(Message::text(msg)) {
                                 println!("Error sending message to client {}: {:?}", id, e);
@@ -1189,26 +1300,53 @@ async fn handle_authenticated_client(
                         } else if msg_type == "sync_request" {
                             if handle_sync_request(&data, client_id.clone(), &clients).await {
                                 println!("Sync to client complete");
-                                match clients.lock() {
-                                    Ok(mut clients_lock) => {
-                                        if let Some(client) = clients_lock.get_mut(&client_id) {
-                                            client.sync_completed = true;
-                                            println!("Client {} marked as fully synced", client_id);
+                                let should_send_message = {
+                                    match clients.lock() {
+                                        Ok(mut clients_lock) => {
+                                            if let Some(client) = clients_lock.get_mut(&client_id) {
+                                                client.sync_completed = true;
+                                                println!(
+                                                    "Client {} marked as fully synced",
+                                                    client_id
+                                                );
+                                                true
+                                            } else {
+                                                false
+                                            }
+                                        }
+                                        Err(e) => {
+                                            println!(
+                                                "Failed to lock clients to update sync status: {:?}",
+                                                e
+                                            );
+                                            false
                                         }
                                     }
-                                    Err(e) => {
-                                        println!(
-                                            "Failed to lock clients to update sync status: {:?}",
-                                            e
-                                        );
-                                    }
+                                };
+
+                                if should_send_message {
+                                    let response = serde_json::json!({
+                                        "type": "sync_from_server_complete",
+                                        "timestamp": chrono::Utc::now().timestamp_millis()
+                                    });
+
+                                    send_message(
+                                        client_id.clone(),
+                                        &response.to_string(),
+                                        &clients,
+                                    )
+                                    .await;
                                 }
                             }
                         } else if msg_type == "sync_complete" {
-                            println!("Sync from client complete");
+                            let response = serde_json::json!({
+                                "type": "sync_to_server_complete",
+                                "timestamp": chrono::Utc::now().timestamp_millis()
+                            });
+
+                            send_message(client_id.clone(), &response.to_string(), &clients).await;
                         } else {
-                            handle_client_message(msg_type, &data, &client_id, &clients).await;
-                            broadcast_message(client_id.clone(), text, &clients).await;
+                            handle_client_message(msg_type, &text, &data, &client_id, &clients).await;
                         }
                     }
                 }

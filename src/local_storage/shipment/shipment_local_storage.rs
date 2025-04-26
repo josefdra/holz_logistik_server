@@ -18,7 +18,7 @@ impl ShipmentLocalStorage {
 
     pub fn get_shipments_by_date(&self, last_edit: i64) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT * FROM shipments WHERE deleted = 0 AND arrivalAtServer > ? ORDER BY lastEdit ASC",
+            "SELECT * FROM shipments WHERE arrivalAtServer > ? ORDER BY lastEdit ASC",
         );
 
         let conn = self.core_storage.get_connection()?;
@@ -35,6 +35,7 @@ impl ShipmentLocalStorage {
             let sawmill_id: String = row.get(7)?;
             let location_id: String = row.get(8)?;
             let arrival_at_server: i64 = row.get(9)?;
+            let deleted: i64 = row.get(10)?;
 
             let shipment_json = serde_json::json!({
                 "id": id,
@@ -46,7 +47,8 @@ impl ShipmentLocalStorage {
                 "contractId": contract_id,
                 "sawmillId": sawmill_id,
                 "locationId": location_id,
-                "arrivalAtServer": arrival_at_server
+                "arrivalAtServer": arrival_at_server,
+                "deleted": deleted
             });
 
             Ok(shipment_json)
@@ -63,7 +65,7 @@ impl ShipmentLocalStorage {
         Ok(shipments)
     }
 
-    pub fn save_shipment(&self, shipment_data: &Value) -> Result<i64> {
+    pub fn save_shipment(&self, shipment_data: &Value) -> Result<bool> {
         let mut shipment_for_save = shipment_data.clone();
         if let serde_json::Value::Object(ref mut map) = shipment_for_save {
             map.insert("arrivalAtServer".to_string(), chrono::Utc::now().timestamp_millis().into());
