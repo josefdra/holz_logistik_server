@@ -1455,7 +1455,7 @@ async fn main() -> Result<()> {
         })?;
     }
 
-    let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+    let port = env::var("PORT").unwrap_or_else(|_| "9090".to_string());
     let port: u16 = port.parse().expect("PORT must be a number");
 
     let clients: Clients = Arc::new(Mutex::new(HashMap::new()));

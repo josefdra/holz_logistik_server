@@ -18,7 +18,7 @@ impl PhotoLocalStorage {
 
     pub fn get_photo_updates_by_date(&self, last_edit: i64) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT * FROM photos WHERE arrivalAtServer > ? ORDER BY lastEdit ASC",
+            "SELECT * FROM photos WHERE arrivalAtServer > ? ORDER BY lastEdit ASC LIMIT 20",
         );
 
         let conn = self.core_storage.get_connection()?;

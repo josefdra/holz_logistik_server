@@ -18,7 +18,7 @@ impl ContractLocalStorage {
 
     pub fn get_contract_updates_by_date(&self, last_edit: i64) -> Result<Vec<Value>> {
         let query = format!(
-            "SELECT * FROM contracts WHERE arrivalAtServer > ? ORDER BY lastEdit ASC",
+            "SELECT * FROM contracts WHERE arrivalAtServer > ? ORDER BY lastEdit ASC LIMIT 100",
         );
 
         let conn = self.core_storage.get_connection()?;

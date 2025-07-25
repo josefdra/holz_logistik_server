@@ -45,7 +45,7 @@ impl LocationLocalStorage {
     pub fn get_location_updates_by_date(&self, last_edit: i64) -> Result<Vec<Value>> {
         let location_ids = {
             let query = format!(
-                "SELECT id FROM locations WHERE arrivalAtServer > ? ORDER BY lastEdit ASC",
+                "SELECT id FROM locations WHERE arrivalAtServer > ? ORDER BY lastEdit ASC LIMIT 100",
             );
 
             let conn = self.core_storage.get_connection()?;
