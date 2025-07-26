@@ -6,7 +6,7 @@
 mkdir -p databases
 
 # User settings - username remains fixed but ID will be UUID
-USER_NAME="josef"
+USER_NAME="driver"
 
 # Prompt for tenant name
 echo -n "Enter tenant name [test]: "
@@ -129,7 +129,7 @@ EOL
 sqlite3 "$DB_PATH" < create_table.sql
 
 # Check if josef user exists
-JOSEF_EXISTS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE name='josef';")
+JOSEF_EXISTS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE name='driver';")
 
 # Create a test user with UUID only if no josef user exists
 if [ "$JOSEF_EXISTS" -eq "0" ]; then
@@ -144,14 +144,14 @@ if [ "$JOSEF_EXISTS" -eq "0" ]; then
 
     sqlite3 "$DB_PATH" << EOL
     INSERT INTO users (id, name, role, lastEdit, arrivalAtServer) 
-    VALUES ('$UUID', 'josef', 2, $UTC_TIMESTAMP, $UTC_TIMESTAMP);
+    VALUES ('$UUID', 'driver', 0, $UTC_TIMESTAMP, $UTC_TIMESTAMP);
 EOL
-    echo "Created new josef user with ID: $UUID"
+    echo "Created new driver user with ID: $UUID"
     USER_ID=$UUID
 else
     # Get existing josef user ID
-    USER_ID=$(sqlite3 "$DB_PATH" "SELECT id FROM users WHERE name='josef' LIMIT 1;")
-    echo "josef user already exists with ID: $USER_ID"
+    USER_ID=$(sqlite3 "$DB_PATH" "SELECT id FROM users WHERE name='driver' LIMIT 1;")
+    echo "driver user already exists with ID: $USER_ID"
 fi
 
 # Update or create .env file

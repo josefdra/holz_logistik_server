@@ -36,6 +36,7 @@ impl ShipmentLocalStorage {
             let location_id: String = row.get(8)?;
             let arrival_at_server: i64 = row.get(9)?;
             let deleted: i64 = row.get(10)?;
+            let additional_info: String = row.get(11)?;
 
             let shipment_json = serde_json::json!({
                 "id": id,
@@ -48,7 +49,8 @@ impl ShipmentLocalStorage {
                 "sawmillId": sawmill_id,
                 "locationId": location_id,
                 "arrivalAtServer": arrival_at_server,
-                "deleted": deleted
+                "deleted": deleted,
+                "additionalInfo": additional_info,
             });
 
             Ok(shipment_json)
