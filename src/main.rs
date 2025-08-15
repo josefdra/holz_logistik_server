@@ -16,16 +16,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	dotenv().ok();
 	env_logger::init();
 
-	// Load configuration
 	let config = Config::from_env()?;
 	let port = config.port;
-
-	// Initialize controller
 	let controller = Arc::new(Controller::new(config));
 
 	log::info!("Starting WebSocket server on port {}...", port);
 
-	// Define routes
 	let ws_route = warp::path("ws")
 		.and(warp::ws())
 		.and(with_controller(controller.clone()))
@@ -36,7 +32,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		});
 
 	let health_route = warp::path::end().map(|| "User Sync WebSocket Server is running.");
-
 	let routes = ws_route.or(health_route);
 
 	warp::serve(routes).run(([0, 0, 0, 0], port)).await;
