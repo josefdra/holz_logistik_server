@@ -153,7 +153,7 @@ if [ "$BOSS_EXISTS" -eq "0" ]; then
 
 	sqlite3 "$DB_PATH" << EOL
 	INSERT INTO users (id, name, role, lastEdit, arrivalAtServer) 
-	VALUES ('$BOSS_UUID', 'boss', 0, $UTC_TIMESTAMP, $UTC_TIMESTAMP);
+	VALUES ('$BOSS_UUID', 'boss', 1, $UTC_TIMESTAMP, $UTC_TIMESTAMP);
 EOL
 	echo "Created new boss user with ID: $BOSS_UUID"
 else
@@ -167,7 +167,7 @@ if [ "$ADMIN_EXISTS" -eq "0" ]; then
 
 	sqlite3 "$DB_PATH" << EOL
 	INSERT INTO users (id, name, role, lastEdit, arrivalAtServer) 
-	VALUES ('$ADMIN_UUID', 'admin', 0, $UTC_TIMESTAMP, $UTC_TIMESTAMP);
+	VALUES ('$ADMIN_UUID', 'admin', 2, $UTC_TIMESTAMP, $UTC_TIMESTAMP);
 EOL
 	echo "Created new admin user with ID: $ADMIN_UUID"
 else
