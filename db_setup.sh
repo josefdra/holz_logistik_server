@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS shipments (
     quantity REAL NOT NULL,
     oversizeQuantity REAL NOT NULL,
     pieceCount INTEGER NOT NULL,
+    additionalInfo TEXT,
     userId TEXT NOT NULL,
     contractId TEXT NOT NULL,
     sawmillId TEXT NOT NULL,

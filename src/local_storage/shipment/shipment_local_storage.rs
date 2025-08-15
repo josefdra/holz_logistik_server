@@ -36,9 +36,9 @@ impl ShipmentLocalStorage {
             let location_id: String = row.get(8)?;
             let arrival_at_server: i64 = row.get(9)?;
             let deleted: i64 = row.get(10)?;
-            let additional_info: String = row.get(11)?;
+            let additional_info: Option<String> = row.get(11).unwrap_or(None);
 
-            let shipment_json = serde_json::json!({
+            let mut shipment_json = serde_json::json!({
                 "id": id,
                 "lastEdit": last_edit,
                 "quantity": quantity,
@@ -49,9 +49,12 @@ impl ShipmentLocalStorage {
                 "sawmillId": sawmill_id,
                 "locationId": location_id,
                 "arrivalAtServer": arrival_at_server,
-                "deleted": deleted,
-                "additionalInfo": additional_info,
+                "deleted": deleted
             });
+
+            if let Some(info) = additional_info {
+                shipment_json["additionalInfo"] = Value::String(info);
+            }
 
             Ok(shipment_json)
         })?;
