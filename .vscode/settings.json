@@ -1,0 +1,6 @@
+{
+  "[rust]": {
+    "editor.insertSpaces": false,
+    "editor.tabSize": 2
+  }
+}
