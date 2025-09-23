@@ -41,6 +41,58 @@ struct Client {
     sync_completed: bool,
 }
 
+fn log_incoming_message(msg_type: &str, client_id: &str, data: &Value) {
+    if msg_type == "photo_update" {
+        let metadata = json!({
+            "id": data.get("id"),
+            "filename": data.get("filename"),
+            "timestamp": data.get("timestamp"),
+            "size": data.get("data")
+                .and_then(|d| d.as_str())
+                .map(|s| s.len())
+                .unwrap_or(0)
+        });
+        println!(
+            "INCOMING [{}] photo_update: {}",
+            client_id,
+            serde_json::to_string(&metadata).unwrap_or_else(|_| "invalid".to_string())
+        );
+    } else {
+        println!(
+            "INCOMING [{}] {}: {}",
+            client_id,
+            msg_type,
+            serde_json::to_string(data).unwrap_or_else(|_| "invalid".to_string())
+        );
+    }
+}
+
+fn log_outgoing_message(msg_type: &str, client_id: &str, data: &Value) {
+    if msg_type == "photo_update" {
+        let metadata = json!({
+            "id": data.get("id"),
+            "filename": data.get("filename"),
+            "timestamp": data.get("timestamp"),
+            "size": data.get("data")
+                .and_then(|d| d.as_str())
+                .map(|s| s.len())
+                .unwrap_or(0)
+        });
+        println!(
+            "OUTGOING [{}] photo_update: {}",
+            client_id,
+            serde_json::to_string(&metadata).unwrap_or_else(|_| "invalid".to_string())
+        );
+    } else {
+        println!(
+            "OUTGOING [{}] {}: {}",
+            client_id,
+            msg_type,
+            serde_json::to_string(data).unwrap_or_else(|_| "invalid".to_string())
+        );
+    }
+}
+
 fn initialize_database(db_path: &str) -> Result<()> {
     let dir_path = Path::new(&db_path).parent().unwrap_or(Path::new(""));
     if !dir_path.exists() {
@@ -94,6 +146,22 @@ fn get_db_pool(tenant: &str, db_pools: &DbPoolMap) -> Result<DbPool> {
     }
 
     Ok(pools.get(tenant).unwrap().clone())
+}
+
+fn get_client_db_path_and_tenant(client_id: &str, clients: &Clients) -> Option<(String, String)> {
+    match clients.lock() {
+        Ok(clients_lock) => {
+            if let Some(client) = clients_lock.get(client_id) {
+                Some((get_db_path(&client.db_name), client.db_name.clone()))
+            } else {
+                None
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to lock clients: {:?}", e);
+            None
+        }
+    }
 }
 
 fn get_client_db_path(client_id: &str, clients: &Clients) -> Option<String> {
@@ -257,21 +325,46 @@ async fn handle_authentication_request(
 
     let user_data = user_result.unwrap();
 
-    let response = json!({
+    let authentication_response = json!({
         "type": "authentication_response",
+        "dbName": tenant,
         "data": {
             "id": user_data.get("id").unwrap_or(&json!("")).as_str(),
             "role": user_data.get("role").unwrap_or(&json!(0)),
             "lastEdit": user_data.get("lastEdit").unwrap_or(&json!(chrono::Utc::now().timestamp_millis())),
             "name": user_data.get("name").unwrap_or(&json!("Unknown User")).as_str(),
             "authenticated": 1,
+            "apiKey": api_key,
+            "bannedStatus": user_data.get("bannedStatus").unwrap_or(&json!(0))
         },
         "timestamp": chrono::Utc::now().timestamp_millis()
     });
 
     send_message(
+        client_id.clone(),
+        &serde_json::to_string(&authentication_response).unwrap(),
+        clients,
+    )
+    .await;
+
+    let user_update = serde_json::json!({
+        "type": "user_update",
+        "data": {
+            "id": user_data.get("id").unwrap_or(&json!("")).as_str(),
+            "role": user_data.get("role").unwrap_or(&json!(0)),
+            "lastEdit": user_data.get("lastEdit").unwrap_or(&json!(chrono::Utc::now().timestamp_millis())),
+            "name": user_data.get("name").unwrap_or(&json!("Unknown User")).as_str(),
+            "authenticated": 1,
+            "apiKey": api_key,
+            "bannedStatus": user_data.get("bannedStatus").unwrap_or(&json!(0))
+        },
+        "dbName": tenant,
+        "timestamp": chrono::Utc::now().timestamp_millis()
+    });
+
+    send_message(
         client_id,
-        &serde_json::to_string(&response).unwrap(),
+        &serde_json::to_string(&user_update).unwrap(),
         clients,
     )
     .await;
@@ -279,7 +372,13 @@ async fn handle_authentication_request(
     true
 }
 
-async fn handle_client_message(msg_type: &str, msg: &str, data: &Value, client_id: &str, clients: &Clients,) {
+async fn handle_client_message(
+    msg_type: &str,
+    msg: &str,
+    data: &Value,
+    client_id: &str,
+    clients: &Clients,
+) {
     let db_path = match get_client_db_path(client_id, clients) {
         Some(path) => path,
         None => {
@@ -307,43 +406,43 @@ async fn handle_client_message(msg_type: &str, msg: &str, data: &Value, client_i
             if update_happened {
                 broadcast_message(client_id.to_string(), msg, &clients).await;
             }
-        },
+        }
         "location_update" => {
             let update_happened = handle_location_update(&data, core_storage.clone());
             if update_happened {
                 broadcast_message(client_id.to_string(), msg, &clients).await;
             }
-        },
+        }
         "note_update" => {
             let update_happened = handle_note_update(&data, core_storage.clone());
             if update_happened {
                 broadcast_message(client_id.to_string(), msg, &clients).await;
             }
-        },
+        }
         "photo_update" => {
             let update_happened = handle_photo_update(&data, core_storage.clone());
             if update_happened {
                 broadcast_message(client_id.to_string(), msg, &clients).await;
             }
-        },
+        }
         "sawmill_update" => {
             let update_happened = handle_sawmill_update(&data, core_storage.clone());
             if update_happened {
                 broadcast_message(client_id.to_string(), msg, &clients).await;
             }
-        },
+        }
         "shipment_update" => {
             let update_happened = handle_shipment_update(&data, core_storage.clone());
             if update_happened {
                 broadcast_message(client_id.to_string(), msg, &clients).await;
             }
-        },
+        }
         "user_update" => {
             let update_happened = handle_user_update(&data, core_storage.clone());
             if update_happened {
                 broadcast_message(client_id.to_string(), msg, &clients).await;
             }
-        },
+        }
         _ => println!("Unknown message type: {}", msg_type),
     }
 }
@@ -351,15 +450,11 @@ async fn handle_client_message(msg_type: &str, msg: &str, data: &Value, client_i
 fn handle_contract_update(data: &Value, core_storage: Arc<CoreLocalStorage>) -> bool {
     match ContractLocalStorage::new(core_storage.clone()) {
         Ok(contract_storage) => {
-            println!("Contract update received: {:?}", data);
-
             let is_deleted = data.get("deleted").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
 
             if !is_deleted {
                 match contract_storage.save_contract(data) {
-                    Ok(success) => {
-                        success
-                    },
+                    Ok(success) => success,
                     Err(e) => {
                         println!("Failed to save contract: {:?}", e);
                         false
@@ -390,8 +485,6 @@ fn handle_contract_update(data: &Value, core_storage: Arc<CoreLocalStorage>) -> 
 fn handle_location_update(data: &Value, core_storage: Arc<CoreLocalStorage>) -> bool {
     match LocationLocalStorage::new(core_storage.clone()) {
         Ok(location_storage) => {
-            println!("Location update received: {:?}", data);
-
             let is_deleted = data.get("deleted").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
 
             if !is_deleted {
@@ -427,8 +520,6 @@ fn handle_location_update(data: &Value, core_storage: Arc<CoreLocalStorage>) -> 
 fn handle_note_update(data: &Value, core_storage: Arc<CoreLocalStorage>) -> bool {
     match NoteLocalStorage::new(core_storage.clone()) {
         Ok(note_storage) => {
-            println!("Note update received: {:?}", data);
-
             let is_deleted = data.get("deleted").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
 
             if !is_deleted {
@@ -464,8 +555,6 @@ fn handle_note_update(data: &Value, core_storage: Arc<CoreLocalStorage>) -> bool
 fn handle_photo_update(data: &Value, core_storage: Arc<CoreLocalStorage>) -> bool {
     match PhotoLocalStorage::new(core_storage.clone()) {
         Ok(photo_storage) => {
-            println!("Photo update received");
-
             let is_deleted = data.get("deleted").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
 
             if !is_deleted {
@@ -501,8 +590,6 @@ fn handle_photo_update(data: &Value, core_storage: Arc<CoreLocalStorage>) -> boo
 fn handle_sawmill_update(data: &Value, core_storage: Arc<CoreLocalStorage>) -> bool {
     match SawmillLocalStorage::new(core_storage.clone()) {
         Ok(sawmill_storage) => {
-            println!("Sawmill update received: {:?}", data);
-
             let is_deleted = data.get("deleted").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
 
             if !is_deleted {
@@ -538,8 +625,6 @@ fn handle_sawmill_update(data: &Value, core_storage: Arc<CoreLocalStorage>) -> b
 fn handle_shipment_update(data: &Value, core_storage: Arc<CoreLocalStorage>) -> bool {
     match ShipmentLocalStorage::new(core_storage.clone()) {
         Ok(shipment_storage) => {
-            println!("Shipment update received: {:?}", data);
-
             let is_deleted = data.get("deleted").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
 
             if !is_deleted {
@@ -575,8 +660,6 @@ fn handle_shipment_update(data: &Value, core_storage: Arc<CoreLocalStorage>) -> 
 fn handle_user_update(data: &Value, core_storage: Arc<CoreLocalStorage>) -> bool {
     match UserLocalStorage::new(core_storage.clone()) {
         Ok(user_storage) => {
-            println!("User update received: {:?}", data);
-
             let is_deleted = data.get("deleted").and_then(|v| v.as_i64()).unwrap_or(0) == 1;
 
             if !is_deleted {
@@ -620,6 +703,7 @@ async fn send_user_data(
     last_sync: i64,
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
+    tenant: &str,
     clients: &Clients,
 ) -> i64 {
     let user_storage = match UserLocalStorage::new(core_storage) {
@@ -649,6 +733,7 @@ async fn send_user_data(
                 let response = serde_json::json!({
                     "type": "user_update",
                     "data": user,
+                    "dbName": tenant,
                     "timestamp": chrono::Utc::now().timestamp_millis()
                 });
 
@@ -667,6 +752,7 @@ async fn send_user_data(
         "data": serde_json::json!({
             "newSyncDate": date,
         }),
+        "dbName": tenant,
         "timestamp": chrono::Utc::now().timestamp_millis()
     });
 
@@ -679,6 +765,7 @@ async fn send_sawmill_data(
     last_sync: i64,
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
+    tenant: &str,
     clients: &Clients,
 ) -> i64 {
     let sawmill_storage = match SawmillLocalStorage::new(core_storage) {
@@ -708,6 +795,7 @@ async fn send_sawmill_data(
                 let response = serde_json::json!({
                     "type": "sawmill_update",
                     "data": sawmill,
+                    "dbName": tenant,
                     "timestamp": chrono::Utc::now().timestamp_millis()
                 });
 
@@ -726,6 +814,7 @@ async fn send_sawmill_data(
         "data": serde_json::json!({
             "newSyncDate": date,
         }),
+        "dbName": tenant,
         "timestamp": chrono::Utc::now().timestamp_millis()
     });
 
@@ -738,6 +827,7 @@ async fn send_contract_data(
     last_sync: i64,
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
+    tenant: &str,
     clients: &Clients,
 ) -> i64 {
     let contract_storage = match ContractLocalStorage::new(core_storage) {
@@ -767,6 +857,7 @@ async fn send_contract_data(
                 let response = serde_json::json!({
                     "type": "contract_update",
                     "data": contract,
+                    "dbName": tenant,
                     "timestamp": chrono::Utc::now().timestamp_millis()
                 });
 
@@ -785,6 +876,7 @@ async fn send_contract_data(
         "data": serde_json::json!({
             "newSyncDate": date,
         }),
+        "dbName": tenant,
         "timestamp": chrono::Utc::now().timestamp_millis()
     });
 
@@ -797,6 +889,7 @@ async fn send_photo_data(
     last_sync: i64,
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
+    tenant: &str,
     clients: &Clients,
 ) -> i64 {
     let photo_storage = match PhotoLocalStorage::new(core_storage) {
@@ -826,6 +919,7 @@ async fn send_photo_data(
                 let response = serde_json::json!({
                     "type": "photo_update",
                     "data": photo,
+                    "dbName": tenant,
                     "timestamp": chrono::Utc::now().timestamp_millis()
                 });
 
@@ -845,6 +939,7 @@ async fn send_photo_data(
         "data": serde_json::json!({
             "newSyncDate": date,
         }),
+        "dbName": tenant,
         "timestamp": chrono::Utc::now().timestamp_millis()
     });
 
@@ -857,6 +952,7 @@ async fn send_note_data(
     last_sync: i64,
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
+    tenant: &str,
     clients: &Clients,
 ) -> i64 {
     let note_storage = match NoteLocalStorage::new(core_storage) {
@@ -886,6 +982,7 @@ async fn send_note_data(
                 let response = serde_json::json!({
                     "type": "note_update",
                     "data": note,
+                    "dbName": tenant,
                     "timestamp": chrono::Utc::now().timestamp_millis()
                 });
 
@@ -904,6 +1001,7 @@ async fn send_note_data(
         "data": serde_json::json!({
             "newSyncDate": date,
         }),
+        "dbName": tenant,
         "timestamp": chrono::Utc::now().timestamp_millis()
     });
 
@@ -916,6 +1014,7 @@ async fn send_location_data(
     last_sync: i64,
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
+    tenant: &str,
     clients: &Clients,
 ) -> i64 {
     let location_storage = match LocationLocalStorage::new(core_storage) {
@@ -945,12 +1044,11 @@ async fn send_location_data(
                 let response = serde_json::json!({
                     "type": "location_update",
                     "data": location,
+                    "dbName": tenant,
                     "timestamp": chrono::Utc::now().timestamp_millis()
                 });
 
                 send_message(client_id.clone(), &response.to_string(), clients).await;
-
-                println!("{}", &response.to_string());
 
                 if let Some(newest_date) = location["arrivalAtServer"].as_i64() {
                     if date <= newest_date {
@@ -966,6 +1064,7 @@ async fn send_location_data(
         "data": serde_json::json!({
             "newSyncDate": date,
         }),
+        "dbName": tenant,
         "timestamp": chrono::Utc::now().timestamp_millis()
     });
 
@@ -978,6 +1077,7 @@ async fn send_shipment_data(
     last_sync: i64,
     client_id: String,
     core_storage: Arc<CoreLocalStorage>,
+    tenant: &str,
     clients: &Clients,
 ) -> i64 {
     let shipment_storage = match ShipmentLocalStorage::new(core_storage) {
@@ -1007,6 +1107,7 @@ async fn send_shipment_data(
                 let response = serde_json::json!({
                     "type": "shipment_update",
                     "data": shipment,
+                    "dbName": tenant,
                     "timestamp": chrono::Utc::now().timestamp_millis()
                 });
 
@@ -1025,6 +1126,7 @@ async fn send_shipment_data(
         "data": serde_json::json!({
             "newSyncDate": date,
         }),
+        "dbName": tenant,
         "timestamp": chrono::Utc::now().timestamp_millis()
     });
 
@@ -1034,8 +1136,8 @@ async fn send_shipment_data(
 }
 
 async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients) -> bool {
-    let db_path = match get_client_db_path(&client_id, clients) {
-        Some(path) => path,
+    let (db_path, tenant) = match get_client_db_path_and_tenant(&client_id, clients) {
+        Some((path, tenant)) => (path, tenant),
         None => {
             println!("No database associated with client {}", client_id);
             return false;
@@ -1089,6 +1191,7 @@ async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients)
         last_user_sync,
         client_id.clone(),
         core_storage.clone(),
+        &tenant,
         clients,
     )
     .await;
@@ -1097,6 +1200,7 @@ async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients)
         last_sawmill_sync,
         client_id.clone(),
         core_storage.clone(),
+        &tenant,
         clients,
     )
     .await;
@@ -1105,6 +1209,7 @@ async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients)
         last_contract_sync,
         client_id.clone(),
         core_storage.clone(),
+        &tenant,
         clients,
     )
     .await;
@@ -1113,6 +1218,7 @@ async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients)
         last_location_sync,
         client_id.clone(),
         core_storage.clone(),
+        &tenant,
         clients,
     )
     .await;
@@ -1121,6 +1227,7 @@ async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients)
         last_shipment_sync,
         client_id.clone(),
         core_storage.clone(),
+        &tenant,
         clients,
     )
     .await;
@@ -1129,6 +1236,7 @@ async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients)
         last_note_sync,
         client_id.clone(),
         core_storage.clone(),
+        &tenant,
         clients,
     )
     .await;
@@ -1137,6 +1245,7 @@ async fn handle_sync_request(data: &Value, client_id: String, clients: &Clients)
         last_photo_sync,
         client_id.clone(),
         core_storage.clone(),
+        &tenant,
         clients,
     )
     .await;
@@ -1148,7 +1257,13 @@ async fn send_message(client_id: String, msg: &str, clients: &Clients) {
     match clients.lock() {
         Ok(clients_lock) => {
             if let Some(client) = clients_lock.get(&client_id) {
-                println!("{}", msg.to_string());
+                if let Ok(json_msg) = serde_json::from_str::<Value>(msg) {
+                    if let Some(msg_type) = json_msg.get("type").and_then(|v| v.as_str()) {
+                        if let Some(data) = json_msg.get("data") {
+                            log_outgoing_message(msg_type, &client_id, data);
+                        }
+                    }
+                }
                 if let Err(e) = client.sender.send(Message::text(msg)) {
                     println!("Error sending message to client {}: {:?}", client_id, e);
                 }
@@ -1171,59 +1286,74 @@ async fn send_pong(client_id: String, clients: &Clients) {
 }
 
 async fn broadcast_message(client_id: String, msg: &str, clients: &Clients) {
-    if let Ok(json_msg) = serde_json::from_str::<Value>(msg) {
+    if let Ok(mut json_msg) = serde_json::from_str::<Value>(msg) {
         match clients.lock() {
             Ok(clients_lock) => {
+                let sender_db_name = if let Some(sender_client) = clients_lock.get(&client_id) {
+                    sender_client.db_name.clone()
+                } else {
+                    println!("Sender client {} not found", client_id);
+                    return;
+                };
+
+                if !json_msg.as_object().unwrap().contains_key("dbName") {
+                    json_msg["dbName"] = json!(sender_db_name);
+                }
+                let enhanced_msg = json_msg.to_string();
+
                 for (id, client) in clients_lock.iter() {
-                    if !client.db_name.is_empty() {
-                        if id != &client_id {
-                            if let Err(e) = client.sender.send(Message::text(msg)) {
-                                println!("Error sending message to client {}: {:?}", id, e);
+                    if client.db_name.is_empty() || client.db_name != sender_db_name {
+                        continue;
+                    }
+
+                    if id != &client_id {
+                        if let Err(e) = client.sender.send(Message::text(&enhanced_msg)) {
+                            println!("Error sending message to client {}: {:?}", id, e);
+                        }
+                    } else {
+                        let is_deleted = json_msg
+                            .get("data")
+                            .and_then(|data| data.get("deleted"))
+                            .and_then(|deleted| deleted.as_i64())
+                            .unwrap_or(0)
+                            == 1;
+
+                        if is_deleted {
+                            if let Err(e) = client.sender.send(Message::text(&enhanced_msg)) {
+                                println!(
+                                    "Error sending delete confirmation to client {}: {:?}",
+                                    id, e
+                                );
                             }
                         } else {
-                            let is_deleted = json_msg
+                            let msg_type = json_msg
+                                .get("type")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("unknown");
+
+                            let entity_id = json_msg
                                 .get("data")
-                                .and_then(|data| data.get("deleted"))
-                                .and_then(|deleted| deleted.as_i64())
-                                .unwrap_or(0)
-                                == 1;
+                                .and_then(|data| data.get("id"))
+                                .cloned()
+                                .unwrap_or(json!("unknown"));
 
-                            if is_deleted {
-                                if let Err(e) = client.sender.send(Message::text(msg)) {
-                                    println!(
-                                        "Error sending delete confirmation to client {}: {:?}",
-                                        id, e
-                                    );
-                                }
-                            } else {
-                                let msg_type = json_msg
-                                    .get("type")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("unknown");
+                            let confirm_msg = json!({
+                                "type": msg_type,
+                                "data": {
+                                    "id": entity_id,
+                                    "synced": 1
+                                },
+                                "dbName": sender_db_name,
+                                "timestamp": chrono::Utc::now().timestamp_millis()
+                            });
 
-                                let entity_id = json_msg
-                                    .get("data")
-                                    .and_then(|data| data.get("id"))
-                                    .cloned()
-                                    .unwrap_or(json!("unknown"));
-
-                                let confirm_msg = json!({
-                                    "type": msg_type,
-                                    "data": {
-                                        "id": entity_id,
-                                        "synced": 1
-                                    },
-                                    "timestamp": chrono::Utc::now().timestamp_millis()
-                                });
-
-                                if let Err(e) =
-                                    client.sender.send(Message::text(&confirm_msg.to_string()))
-                                {
-                                    println!(
-                                        "Error sending sync confirmation to client {}: {:?}",
-                                        id, e
-                                    );
-                                }
+                            if let Err(e) =
+                                client.sender.send(Message::text(&confirm_msg.to_string()))
+                            {
+                                println!(
+                                    "Error sending sync confirmation to client {}: {:?}",
+                                    id, e
+                                );
                             }
                         }
                     }
@@ -1249,6 +1379,11 @@ async fn authenticate_client(
             Ok(msg) => {
                 if let Some(text) = msg.to_str().ok() {
                     if let Ok(json_msg) = serde_json::from_str::<Value>(text) {
+                        if json_msg.get("version").and_then(|v| v.as_i64()) != Some(1) {
+                            println!("Wrong client version");
+                            return false;
+                        }
+
                         if json_msg.get("type").and_then(|v| v.as_str())
                             == Some("authentication_request")
                         {
@@ -1285,15 +1420,21 @@ async fn handle_authenticated_client(
                             .and_then(|v| v.as_str())
                             .unwrap_or("unknown");
 
-                        println!("Received message from client {}: {}", client_id, msg_type);
-
-                        if msg_type != "photo_update" {
-                            println!("{}", text);
-                        } else {
-                            println!("photo_update");
-                        }
-
                         let data = json_msg.get("data").cloned().unwrap_or(json!({}));
+                        log_incoming_message(msg_type, &client_id, &data);
+
+                        let client_db_name = {
+                            match clients.lock() {
+                                Ok(clients_lock) => {
+                                    if let Some(client) = clients_lock.get(&client_id) {
+                                        client.db_name.clone()
+                                    } else {
+                                        String::new()
+                                    }
+                                }
+                                Err(_) => String::new(),
+                            }
+                        };
 
                         if msg_type == "ping" {
                             send_pong(client_id.clone(), &clients).await;
@@ -1327,6 +1468,7 @@ async fn handle_authenticated_client(
                                 if should_send_message {
                                     let response = serde_json::json!({
                                         "type": "sync_from_server_complete",
+                                        "dbName": client_db_name,
                                         "timestamp": chrono::Utc::now().timestamp_millis()
                                     });
 
@@ -1341,12 +1483,14 @@ async fn handle_authenticated_client(
                         } else if msg_type == "sync_complete" {
                             let response = serde_json::json!({
                                 "type": "sync_to_server_complete",
+                                "dbName": client_db_name,
                                 "timestamp": chrono::Utc::now().timestamp_millis()
                             });
 
                             send_message(client_id.clone(), &response.to_string(), &clients).await;
                         } else {
-                            handle_client_message(msg_type, &text, &data, &client_id, &clients).await;
+                            handle_client_message(msg_type, &text, &data, &client_id, &clients)
+                                .await;
                         }
                     }
                 }
